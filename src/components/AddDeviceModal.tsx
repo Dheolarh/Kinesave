@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { X, Wind, Droplets, Flame, Fan, Check } from "lucide-react";
+import { X, Wind, Droplets, Flame, Fan, Check, AlertCircle } from "lucide-react";
+import { scanDevices, type MatterDevice } from "../utils/api";
 
 interface AddDeviceModalProps {
   isOpen: boolean;
@@ -8,26 +9,19 @@ interface AddDeviceModalProps {
   onAdd: (device: any) => void;
 }
 
-const iconMap = {
+const iconMap: Record<string, any> = {
   ac: Wind,
   dehumidifier: Droplets,
   heater: Flame,
   fan: Fan,
+  pump: Droplets, // For Google MVD virtual pump
 };
 
-// Mock nearby devices that will be "detected"
-const nearbyDevices = [
-  { id: "nearby-1", name: "LG Smart AC", type: "ac", power: 1500 },
-  { id: "nearby-2", name: "Frigidaire Dehumidifier", type: "dehumidifier", power: 350 },
-  { id: "nearby-3", name: "Dyson Space Heater", type: "heater", power: 1200 },
-  { id: "nearby-4", name: "Honeywell Tower Fan", type: "fan", power: 75 },
-  { id: "nearby-5", name: "GE Window AC", type: "ac", power: 1800 },
-];
-
 export default function AddDeviceModal({ isOpen, onClose, onAdd }: AddDeviceModalProps) {
-  const [stage, setStage] = useState<"scanning" | "selection">("scanning");
-  const [detectedDevices, setDetectedDevices] = useState<typeof nearbyDevices>([]);
+  const [stage, setStage] = useState<"scanning" | "selection" | "error">("scanning");
+  const [detectedDevices, setDetectedDevices] = useState<MatterDevice[]>([]);
   const [selectedDevices, setSelectedDevices] = useState<string[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -35,25 +29,25 @@ export default function AddDeviceModal({ isOpen, onClose, onAdd }: AddDeviceModa
       setStage("scanning");
       setDetectedDevices([]);
       setSelectedDevices([]);
+      setError(null);
 
-      // Simulate device detection
-      const deviceDetectionTimers: NodeJS.Timeout[] = [];
-      nearbyDevices.forEach((device, index) => {
-        const timer = setTimeout(() => {
-          setDetectedDevices((prev) => [...prev, device]);
-        }, 300 * (index + 1));
-        deviceDetectionTimers.push(timer);
-      });
+      // Scan for devices using backend API
+      const scanForDevices = async () => {
+        try {
+          console.log('🔍 Scanning for Matter devices...');
+          const result = await scanDevices();
+          console.log('✅ Devices found:', result.devices);
 
-      // Move to selection stage after all devices are detected
-      const finalTimer = setTimeout(() => {
-        setStage("selection");
-      }, 300 * (nearbyDevices.length + 1));
-      deviceDetectionTimers.push(finalTimer);
-
-      return () => {
-        deviceDetectionTimers.forEach(clearTimeout);
+          setDetectedDevices(result.devices);
+          setStage("selection");
+        } catch (err) {
+          console.error('❌ Device scan failed:', err);
+          setError('Failed to scan for devices. Make sure the backend server is running.');
+          setStage("error");
+        }
       };
+
+      scanForDevices();
     }
   }, [isOpen]);
 
@@ -67,9 +61,15 @@ export default function AddDeviceModal({ isOpen, onClose, onAdd }: AddDeviceModa
 
   const handleAddDevices = () => {
     selectedDevices.forEach((deviceId) => {
-      const device = nearbyDevices.find((d) => d.id === deviceId);
+      const device = detectedDevices.find((d) => d.id === deviceId);
       if (device) {
-        onAdd(device);
+        // Convert MatterDevice to the format expected by the app
+        onAdd({
+          id: device.id,
+          name: device.name,
+          type: device.type,
+          power: device.power || 0,
+        });
       }
     });
     onClose();
@@ -122,42 +122,36 @@ export default function AddDeviceModal({ isOpen, onClose, onAdd }: AddDeviceModa
                   </div>
                 </div>
                 <p className="text-center text-sm text-black/60 mb-4">
-                  Looking for nearby smart devices...
+                  Looking for Matter devices on your network...
                 </p>
-                <div className="space-y-2">
-                  {detectedDevices.map((device, index) => {
-                    const Icon = iconMap[device.type as keyof typeof iconMap];
-                    return (
-                      <motion.div
-                        key={device.id}
-                        className="flex items-center gap-3 bg-white/40 backdrop-blur-sm border border-white/60 rounded-2xl p-4"
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: 0.1 }}
-                      >
-                        <div className="w-10 h-10 bg-white/50 backdrop-blur-sm border border-white/60 rounded-xl flex items-center justify-center">
-                          <Icon className="w-5 h-5" strokeWidth={1.5} />
-                        </div>
-                        <div className="flex-1">
-                          <p className="text-sm">{device.name}</p>
-                          <p className="text-xs text-black/50">{device.power}W</p>
-                        </div>
-                        <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                      </motion.div>
-                    );
-                  })}
+              </div>
+            )}
+
+            {stage === "error" && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-center py-8">
+                  <AlertCircle className="w-16 h-16 text-red-500" strokeWidth={1.5} />
                 </div>
+                <p className="text-center text-sm text-black/60">
+                  {error}
+                </p>
+                <button
+                  onClick={onClose}
+                  className="w-full py-3.5 bg-black text-white rounded-full text-sm tracking-wide hover:bg-black/90 transition-colors"
+                >
+                  Close
+                </button>
               </div>
             )}
 
             {stage === "selection" && (
               <div className="space-y-3">
                 <p className="text-sm text-black/60 mb-4">
-                  Found {nearbyDevices.length} devices. Select the ones you want to add.
+                  Found {detectedDevices.length} device(s). Select the ones you want to add.
                 </p>
                 <div className="space-y-2 mb-6">
-                  {nearbyDevices.map((device, index) => {
-                    const Icon = iconMap[device.type as keyof typeof iconMap];
+                  {detectedDevices.map((device, index) => {
+                    const Icon = iconMap[device.type] || Wind;
                     const isSelected = selectedDevices.includes(device.id);
                     return (
                       <motion.button
@@ -177,11 +171,10 @@ export default function AddDeviceModal({ isOpen, onClose, onAdd }: AddDeviceModa
                           <p className="text-xs text-black/50">{device.power}W</p>
                         </div>
                         <div
-                          className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
-                            isSelected
+                          className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ${isSelected
                               ? "border-black bg-black"
                               : "border-black/20"
-                          }`}
+                            }`}
                         >
                           {isSelected && <Check className="w-4 h-4 text-white" strokeWidth={2.5} />}
                         </div>
