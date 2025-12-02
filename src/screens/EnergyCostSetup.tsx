@@ -183,7 +183,7 @@ export default function EnergyCostSetup() {
             />
           </div>
           {selectedDevices.length > 0 && !monthlyCost ? (
-            <p className="text-xs !text-red-500 mt-2 px-1" style={{color: "red", marginTop: "5px"}}>This field cannot be empty</p>
+            <p className="text-xs mt-2 px-1" style={{color: "red", marginTop: "5px"}}>This field cannot be empty</p>
           ) : (
             <p className="text-xs text-black/40 mt-2 px-1" style={{marginTop: "5px"}}>Check your recent electricity bill</p>
           )}
