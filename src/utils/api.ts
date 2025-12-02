@@ -92,3 +92,27 @@ export async function controlDevice(id: string, command: any): Promise<boolean> 
         throw error;
     }
 }
+/**
+ * Commission a new device using pairing code
+ */
+export async function commissionDevice(pairingCode: string): Promise<boolean> {
+    try {
+        const response = await fetch(`${API_BASE_URL}/devices/commission`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ pairingCode }),
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to commission device');
+        }
+
+        const result = await response.json();
+        return true;
+    } catch (error) {
+        console.error('Error commissioning device:', error);
+        throw error;
+    }
+}

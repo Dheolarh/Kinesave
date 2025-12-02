@@ -1,98 +1,44 @@
 import { MatterDevice } from './types.js';
-// TODO: Add actual Matter.js imports when implementing real device discovery
-// import { MatterServer } from '@matter/main';
-// import { ServerNode } from '@matter/main/node';
-import { Socket } from 'net';
-import * as fs from 'fs';
+import { ControllerProcess } from './controller-process.js';
 
 class MatterController {
     private discoveredDevices: Map<string, MatterDevice> = new Map();
     private isInitialized = false;
+    private controllerProcess?: ControllerProcess;
 
     async initialize() {
-        try {
-            console.log('Initializing Matter controller...');
+        if (this.isInitialized) return;
 
-            // Matter.js initialization will go here
-            // For now, we'll simulate device discovery
+        try {
+            console.log('Initializing Matter controller with IPC...');
+
+            // Create and start the controller process
+            this.controllerProcess = new ControllerProcess();
+            await this.controllerProcess.start();
 
             this.isInitialized = true;
-            console.log('Matter controller initialized');
+            console.log('Matter controller initialized successfully (IPC mode)');
+
         } catch (error) {
             console.error('Failed to initialize Matter controller:', error);
             throw error;
         }
     }
 
-    async scanForDevices(): Promise<MatterDevice[]> {
-        console.log('Scanning for Matter devices...');
+    private updateDeviceList() {
+        // Placeholder for device listing from storage
+        // Once devices are commissioned, we'll load them from storage
         this.discoveredDevices.clear();
-
-        try {
-            // Approach 1: Port Check for Google MVD
-            // Check if port 5540 is open (standard port for Google MVD)
-            const isMvdRunning = await this.checkPort(5540);
-
-            if (isMvdRunning) {
-                console.log('Google MVD detected on port 5540');
-                const mvdDevice: MatterDevice = {
-                    id: 'mvd-pump-5540',
-                    name: 'Google MVD Virtual Pump',
-                    type: 'pump',
-                    power: 1500,
-                    status: 'active',
-                    vendorId: '0xFFF1',
-                    productId: '0x8000',
-                    discriminator: '3840',
-                    port: 5540
-                };
-                this.discoveredDevices.set(mvdDevice.id, mvdDevice);
-            } else {
-                console.log('No device detected on port 5540');
-            }
-
-            console.log(`Found ${this.discoveredDevices.size} device(s)`);
-            return Array.from(this.discoveredDevices.values());
-        } catch (error) {
-            console.error('Device scan failed:', error);
-            return [];
-        }
     }
 
-    private checkPort(port: number): Promise<boolean> {
-        return new Promise((resolve) => {
-            const log = (msg: string) => {
-                try {
-                    fs.appendFileSync('debug.log', `${new Date().toISOString()} - ${msg}\n`);
-                } catch (e) {
-                    console.error('Failed to write to log:', e);
-                }
-            };
+    async scanForDevices(): Promise<MatterDevice[]> {
+        if (!this.isInitialized) {
+            await this.initialize();
+        }
 
-            const socket = new Socket();
-            socket.setTimeout(500);
-
-            log(`Checking port ${port}...`);
-
-            socket.on('connect', () => {
-                log(`Port ${port} is open (connect event)`);
-                socket.destroy();
-                resolve(true);
-            });
-
-            socket.on('timeout', () => {
-                log(`Port ${port} timed out`);
-                socket.destroy();
-                resolve(false);
-            });
-
-            socket.on('error', (err: any) => {
-                log(`Port ${port} error: ${err.message}`);
-                resolve(false);
-            });
-
-            socket.connect(port, '127.0.0.1');
-        });
+        this.updateDeviceList();
+        console.log(`Returning ${this.discoveredDevices.size} commissioned device(s)`);
+        return Array.from(this.discoveredDevices.values());
     }
 
     getDevices(): MatterDevice[] {
@@ -105,17 +51,51 @@ class MatterController {
 
     async controlDevice(id: string, command: any): Promise<boolean> {
         console.log(`Controlling device ${id}:`, command);
+        // TODO: Implement actual control in Phase 3
+        return true;
+    }
 
-        const device = this.getDevice(id);
-        if (!device) {
-            throw new Error(`Device ${id} not found`);
+    async commissionDevice(pairingCode: string): Promise<boolean> {
+        if (!this.controllerProcess) {
+            throw new Error('Controller not initialized');
         }
 
-        // TODO: Implement actual device control via Matter
-        console.log(`Command sent to ${device.name}`);
-        return true;
+        console.log(`Attempting to commission device with code: ${pairingCode}`);
+
+        try {
+            // Send commission request to controller process
+            const result = await this.controllerProcess.commission(pairingCode);
+            console.log('Commission result:', result);
+
+            // Update the discovered devices list
+            this.updateDeviceList();
+
+            return true;
+        } catch (error) {
+            console.error('Commissioning failed:', error);
+            throw error;
+        }
+    }
+
+    async shutdown() {
+        if (this.controllerProcess) {
+            this.controllerProcess.stop();
+            this.controllerProcess = undefined;
+        }
+        this.isInitialized = false;
     }
 }
 
 // Export singleton instance
 export const matterController = new MatterController();
+
+// Cleanup on process exit
+process.on('SIGINT', async () => {
+    await matterController.shutdown();
+    process.exit(0);
+});
+
+process.on('SIGTERM', async () => {
+    await matterController.shutdown();
+    process.exit(0);
+});

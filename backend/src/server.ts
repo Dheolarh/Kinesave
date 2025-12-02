@@ -1,5 +1,5 @@
 import express from 'express';
-// Force reload
+// Force reload 10
 import cors from 'cors';
 import { matterController } from './matter/controller.js';
 
@@ -52,8 +52,27 @@ app.get('/api/devices/scan', async (req, res) => {
             timestamp: new Date().toISOString()
         });
     } catch (error) {
-        console.error('Error scanning for devices:', error);
+        console.error('Scan failed:', error);
         res.status(500).json({ error: 'Failed to scan for devices' });
+    }
+});
+
+app.post('/api/devices/commission', async (req, res) => {
+    try {
+        const { pairingCode } = req.body;
+        if (!pairingCode) {
+            return res.status(400).json({ error: 'Pairing code is required' });
+        }
+
+        const success = await matterController.commissionDevice(pairingCode);
+        if (success) {
+            res.json({ message: 'Device commissioned successfully' });
+        } else {
+            res.status(500).json({ error: 'Commissioning failed' });
+        }
+    } catch (error: any) {
+        console.error('Commissioning failed:', error);
+        res.status(500).json({ error: error.message || 'Failed to commission device' });
     }
 });
 
