@@ -1,6 +1,6 @@
-// API client for communicating with KineSave Matter Backend
+// API client for KineSave Backend
 
-const API_BASE_URL = 'http://localhost:5000/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api';
 
 export interface MatterDevice {
     id: string;
@@ -14,105 +14,139 @@ export interface MatterDevice {
     port?: number;
 }
 
-export interface DeviceScanResult {
-    devices: MatterDevice[];
-    count: number;
-    timestamp: string;
+export interface EnergyStarDevice {
+  brand: string;
+  modelNumber: string;
+  productName: string;
+  category: string;
+  annualEnergyUse?: number;
+  energyStarRating?: string;
+  additionalSpecs?: any;
+}
+
+export interface DeviceSearchResult {
+  found: boolean;
+  count: number;
+  devices: EnergyStarDevice[];
 }
 
 /**
- * Fetch all discovered devices
+ * Search Energy Star database for devices
  */
-export async function fetchDevices(): Promise<DeviceScanResult> {
-    try {
-        const response = await fetch(`${API_BASE_URL}/devices`);
-        if (!response.ok) {
-            throw new Error('Failed to fetch devices');
-        }
-        return await response.json();
-    } catch (error) {
-        console.error('Error fetching devices:', error);
-        throw error;
+export async function searchDevices(query: {
+  deviceType?: string;
+  brand?: string;
+  model?: string;
+}): Promise<DeviceSearchResult> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/devices/search`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(query),
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to search devices');
     }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Error searching devices:', error);
+    throw error;
+  }
 }
 
 /**
- * Trigger a new device scan
+ * Add device to user's home
  */
-export async function scanDevices(): Promise<DeviceScanResult> {
-    try {
-        const response = await fetch(`${API_BASE_URL}/devices/scan`);
-        if (!response.ok) {
-            throw new Error('Failed to scan devices');
-        }
-        return await response.json();
-    } catch (error) {
-        console.error('Error scanning devices:', error);
-        throw error;
+export async function addDevice(device: {
+  brand: string;
+  modelNumber: string;
+  productName: string;
+  deviceType: string;
+  room: string;
+  customName?: string;
+  energyStarSpecs: any;
+}): Promise<any> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/devices`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(device),
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to add device');
     }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Error adding device:', error);
+    throw error;
+  }
 }
 
 /**
- * Get details for a specific device
+ * Fetch user's devices
  */
-export async function getDevice(id: string): Promise<MatterDevice> {
-    try {
-        const response = await fetch(`${API_BASE_URL}/devices/${id}`);
-        if (!response.ok) {
-            throw new Error(`Device ${id} not found`);
-        }
-        return await response.json();
-    } catch (error) {
-        console.error('Error fetching device:', error);
-        throw error;
+export async function getUserDevices(): Promise<any> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/devices`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch devices');
     }
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching devices:', error);
+    throw error;
+  }
 }
 
 /**
- * Send control command to a device
+ * Get survey questions for a device
  */
-export async function controlDevice(id: string, command: any): Promise<boolean> {
-    try {
-        const response = await fetch(`${API_BASE_URL}/devices/${id}/control`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ command }),
-        });
-
-        if (!response.ok) {
-            throw new Error('Failed to control device');
-        }
-
-        const result = await response.json();
-        return result.success;
-    } catch (error) {
-        console.error('Error controlling device:', error);
-        throw error;
+export async function getSurveyQuestions(deviceId: string): Promise<any> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/devices/${deviceId}/survey`);
+    if (!response.ok) {
+      throw new Error('Failed to get survey questions');
     }
+    return await response.json();
+  } catch (error) {
+    console.error('Error getting survey:', error);
+    throw error;
+  }
 }
+
 /**
- * Commission a new device using pairing code
+ * Submit usage survey for a device
  */
-export async function commissionDevice(pairingCode: string): Promise<boolean> {
-    try {
-        const response = await fetch(`${API_BASE_URL}/devices/commission`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ pairingCode }),
-        });
-
-        if (!response.ok) {
-            throw new Error('Failed to commission device');
-        }
-
-        const result = await response.json();
-        return true;
-    } catch (error) {
-        console.error('Error commissioning device:', error);
-        throw error;
+export async function submitSurvey(deviceId: string, answers: {
+  frequency: string;
+  hoursPerDay: number;
+  usageTimes: string[];
+  room: string;
+}): Promise<any> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/devices/${deviceId}/survey`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(answers),
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to submit survey');
     }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Error submitting survey:', error);
+    throw error;
+  }
 }

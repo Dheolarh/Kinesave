@@ -2,6 +2,7 @@ import { createBrowserRouter } from "react-router";
 import SplashScreen from "../screens/SplashScreen";
 import LocationDetection from "../screens/LocationDetection";
 import EnergyCostSetup from "../screens/EnergyCostSetup";
+import UsageSurvey from "../screens/UsageSurvey";
 import Dashboard from "../screens/Dashboard";
 import DeviceDetails from "../screens/DeviceDetails";
 import AIAnalysis from "../screens/AIAnalysis";
@@ -20,6 +21,10 @@ export const router = createBrowserRouter([
   {
     path: "/setup",
     Component: EnergyCostSetup,
+  },
+  {
+    path: "/usage-survey",
+    Component: UsageSurvey,
   },
   {
     path: "/dashboard",

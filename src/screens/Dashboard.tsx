@@ -4,11 +4,15 @@ import { Plus, Wind, Droplets, Flame, Fan, CloudSun } from "lucide-react";
 import BottomNav from "../components/BottomNav";
 import FloatingAIRing from "../components/FloatingAIRing";
 import AddDeviceModal from "../components/AddDeviceModal";
+import { getUserDevices } from "../utils/api";
+import { getLocationFromStorage } from "../utils/location";
 import { motion } from "motion/react";
 
 const iconMap = {
   ac: Wind,
+  air_conditioner: Wind,
   dehumidifier: Droplets,
+  refrigerator: Droplets,
   heater: Flame,
   fan: Fan,
 };
@@ -18,36 +22,43 @@ export default function Dashboard() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [devices, setDevices] = useState<any[]>([]);
   const [activePlan, setActivePlan] = useState<any>(null);
+  const [location, setLocation] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
-  // Load devices and active plan from localStorage
+  // Load devices from backend API
   useEffect(() => {
-    const savedDevices = localStorage.getItem("userDevices");
-    if (savedDevices) {
-      const parsedDevices = JSON.parse(savedDevices);
-      setDevices(parsedDevices.map((device: any, index: number) => ({
-        ...device,
-        id: String(index + 1),
-        status: "active",
-      })));
-    }
-
-    const savedPlan = localStorage.getItem("activePlan");
-    if (savedPlan) {
-      setActivePlan(JSON.parse(savedPlan));
-    }
+    loadData();
   }, []);
 
+  const loadData = async () => {
+    try {
+      setLoading(true);
+
+      // Load location
+      const savedLocation = getLocationFromStorage();
+      if (savedLocation) {
+        setLocation(savedLocation);
+      }
+
+      // Load devices from backend
+      const result = await getUserDevices();
+      setDevices(result.devices || []);
+
+      // Load active plan
+      const savedPlan = localStorage.getItem("activePlan");
+      if (savedPlan) {
+        setActivePlan(JSON.parse(savedPlan));
+      }
+    } catch (error) {
+      console.error("Failed to load data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleAddDevice = (device: any) => {
-    const newDevice = {
-      id: String(devices.length + 1),
-      ...device,
-      status: "active",
-    };
-    const updatedDevices = [...devices, newDevice];
-    setDevices(updatedDevices);
-    
-    // Save to localStorage
-    localStorage.setItem("userDevices", JSON.stringify(updatedDevices));
+    // Device already added to backend, just refresh
+    loadData();
     setShowAddModal(false);
   };
 
@@ -61,9 +72,9 @@ export default function Dashboard() {
         >
           <h1 className="text-2xl mb-3 tracking-tight font-semibold">My Devices</h1>
           <div className="flex items-center justify-between text-sm text-black/60">
-            <div>San Francisco, CA</div>
+            <div>{location?.city || 'Location'}, {location?.region || 'Unknown'}</div>
             <div className="flex items-center gap-2">
-              <span>68°F • 45%</span>
+              <span>{location?.temperature || '—'}°C • {location?.humidity || '—'}%</span>
               <CloudSun className="w-4 h-4" strokeWidth={1.5} />
             </div>
           </div>
@@ -126,9 +137,8 @@ export default function Dashboard() {
                 transition={{ delay: 0.2 + (index + 1) * 0.05 }}
               >
                 <div
-                  className={`absolute top-3 right-3 w-2 h-2 rounded-full ${
-                    device.status === "active" ? "bg-green-500" : "bg-black/20"
-                  }`}
+                  className={`absolute top-3 right-3 w-2 h-2 rounded-full ${device.status === "active" ? "bg-green-500" : "bg-black/20"
+                    }`}
                 />
                 <div className="w-12 h-12 bg-white/50 backdrop-blur-sm border border-white/60 rounded-2xl flex items-center justify-center">
                   <Icon className="w-6 h-6" strokeWidth={1.5} />

@@ -99,14 +99,21 @@ export default function EnergyCostSetup() {
     ? `${locationData.city}${locationData.region ? `, ${locationData.region}` : ""}`
     : "Unknown Location";
 
-  const handleAddDevices = (device: any) => {
+  const handleAddDevices = (device: any, deviceId?: string) => {
     // Check if device already exists to avoid duplicates
     setSelectedDevices((prev) => {
       const exists = prev.find(d => d.name === device.name);
       if (exists) {
         return prev;
       }
-      return [...prev, device];
+      const updatedDevices = [...prev, { ...device, deviceId }];
+
+      // If this is the first device, navigate to survey
+      if (prev.length === 0 && deviceId) {
+        navigate("/usage-survey", { state: { device: { ...device, id: deviceId } } });
+      }
+
+      return updatedDevices;
     });
   };
 
@@ -183,9 +190,9 @@ export default function EnergyCostSetup() {
             />
           </div>
           {selectedDevices.length > 0 && !monthlyCost ? (
-            <p className="text-xs mt-2 px-1" style={{color: "red", marginTop: "5px"}}>This field cannot be empty</p>
+            <p className="text-xs mt-2 px-1" style={{ color: "red", marginTop: "5px" }}>This field cannot be empty</p>
           ) : (
-            <p className="text-xs text-black/40 mt-2 px-1" style={{marginTop: "5px"}}>Check your recent electricity bill</p>
+            <p className="text-xs text-black/40 mt-2 px-1" style={{ marginTop: "5px" }}>Check your recent electricity bill</p>
           )}
         </motion.div>
 
@@ -213,9 +220,9 @@ export default function EnergyCostSetup() {
             />
           </div>
           {selectedDevices.length > 0 && !pricePerKwh ? (
-            <p className="text-xs mt-2 px-1" style={{color: "red", marginTop: "5px"}}>This field cannot be empty</p>
+            <p className="text-xs mt-2 px-1" style={{ color: "red", marginTop: "5px" }}>This field cannot be empty</p>
           ) : (
-            <p className="text-xs text-black/40 mt-2 px-1" style={{marginTop: "5px"}}>Found on your electricity bill (per kWh rate)</p>
+            <p className="text-xs text-black/40 mt-2 px-1" style={{ marginTop: "5px" }}>Found on your electricity bill (per kWh rate)</p>
           )}
         </motion.div>
 
