@@ -23,12 +23,7 @@ export default function BottomNav({ active }: BottomNavProps) {
           <span className={`text-xs ${active === "home" ? "" : "text-black/50"}`}>
             Home
           </span>
-          {active === "home" && (
-            <motion.div
-              className="absolute -bottom-4 left-1/2 -translate-x-1/2 w-1 h-1 bg-black rounded-full"
-              layoutId="nav-indicator"
-            />
-          )}
+
         </button>
 
         <button
@@ -42,12 +37,7 @@ export default function BottomNav({ active }: BottomNavProps) {
           <span className={`text-xs ${active === "plans" ? "" : "text-black/50"}`}>
             Plans
           </span>
-          {active === "plans" && (
-            <motion.div
-              className="absolute -bottom-4 left-1/2 -translate-x-1/2 w-1 h-1 bg-black rounded-full"
-              layoutId="nav-indicator"
-            />
-          )}
+
         </button>
       </div>
     </div>
