@@ -338,12 +338,15 @@
     appearance: button;
   }
 
-  ::-webkit-inner-spin-button {
-    height: auto;
+  /* Hide number input spinners */
+  input[type=number]::-webkit-inner-spin-button, 
+  input[type=number]::-webkit-outer-spin-button { 
+    -webkit-appearance: none; 
+    margin: 0; 
   }
 
-  ::-webkit-outer-spin-button {
-    height: auto;
+  input[type=number] {
+    -moz-appearance: textfield;
   }
 
   [hidden]:where(:not([hidden="until-found"])) {

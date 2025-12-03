@@ -134,6 +134,7 @@ export default function EnergyCostSetup() {
     const newDevice = {
       ...device,
       name: device.productName || device.name, // Handle both formats
+      customName: device.customName,
       power: device.additionalSpecs?.powerRatingW || device.power || 0,
       deviceId
     };
@@ -230,8 +231,12 @@ export default function EnergyCostSetup() {
             </div>
             <input
               type="number"
+              min="0"
               value={monthlyCost}
               onChange={(e) => setMonthlyCost(e.target.value)}
+              onBlur={() => {
+                if (parseFloat(monthlyCost) < 0) setMonthlyCost("0");
+              }}
               placeholder="150.00"
               required
               className="w-full pl-10 pr-4 py-4 bg-white/50 backdrop-blur-sm border border-white/60 rounded-2xl text-sm focus:outline-none focus:border-black/30 transition-colors shadow-lg"
@@ -260,8 +265,12 @@ export default function EnergyCostSetup() {
             <input
               type="number"
               step="0.01"
+              min="0"
               value={pricePerKwh}
               onChange={(e) => setPricePerKwh(e.target.value)}
+              onBlur={() => {
+                if (parseFloat(pricePerKwh) < 0) setPricePerKwh("0");
+              }}
               placeholder="0.15"
               required
               className="w-full pl-10 pr-4 py-4 bg-white/50 backdrop-blur-sm border border-white/60 rounded-2xl text-sm focus:outline-none focus:border-black/30 transition-colors shadow-lg"
@@ -377,8 +386,8 @@ function SwipeableDeviceItem({ device, onRemove }: { device: any, onRemove: () =
 
       <div className="bg-white/50 backdrop-blur-sm border border-white/60 rounded-2xl p-4 flex items-center justify-between relative z-10">
         <div>
-          <p className="text-sm">{device.name}</p>
-          <p className="text-xs text-black/50">{device.power}W</p>
+          <p className="text-sm">{device.customName || device.name}</p>
+          <p className="text-xs text-black/50">{device.customName ? device.name : `${device.power}W`}</p>
         </div>
         <div className="w-2 h-2 bg-green-500 rounded-full" />
       </div>

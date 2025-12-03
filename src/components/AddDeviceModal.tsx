@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { X, Wind, Droplets, Flame, Fan, Search, Check, Zap } from "lucide-react";
+import { X, Wind, Droplets, Flame, Fan, Search, Check, Zap, Tv } from "lucide-react";
 import { searchDevices, addDevice, submitSurvey, type EnergyStarDevice } from "../utils/api";
 
 interface AddDeviceModalProps {
@@ -12,7 +12,7 @@ interface AddDeviceModalProps {
 const DEVICE_TYPES = [
   { value: "air_conditioner", label: "Air Conditioner", icon: Wind },
   { value: "refrigerator", label: "Refrigerator", icon: Droplets },
-  { value: "tv", label: "TV", icon: Zap },
+  { value: "tv", label: "TV", icon: Tv },
   { value: "washing_machine", label: "Washing Machine", icon: Fan },
   { value: "heater", label: "Heater", icon: Flame },
   { value: "led_bulb", label: "LED Bulb", icon: Zap },
@@ -35,6 +35,7 @@ export default function AddDeviceModal({ isOpen, onClose, onAdd }: AddDeviceModa
   const [hoursPerDay, setHoursPerDay] = useState("");
   const [usageTimes, setUsageTimes] = useState<string[]>([]);
   const [room, setRoom] = useState("");
+  const [customName, setCustomName] = useState("");
   const [isSubmittingSurvey, setIsSubmittingSurvey] = useState(false);
 
   const resetModal = () => {
@@ -52,6 +53,7 @@ export default function AddDeviceModal({ isOpen, onClose, onAdd }: AddDeviceModa
     setHoursPerDay("");
     setUsageTimes([]);
     setRoom("");
+    setCustomName("");
   };
 
   const handleSearch = async () => {
@@ -90,39 +92,8 @@ export default function AddDeviceModal({ isOpen, onClose, onAdd }: AddDeviceModa
 
   const handleAddDevice = async () => {
     if (!selectedDevice) return;
-
-    setIsAdding(true);
-    setStage("adding");
-
-    try {
-      const response = await addDevice({
-        brand: selectedDevice.brand,
-        modelNumber: selectedDevice.modelNumber,
-        productName: selectedDevice.productName,
-        deviceType: deviceType || selectedDevice.category,
-        room: "",
-        energyStarSpecs: {
-          annualEnergyUse: selectedDevice.annualEnergyUse,
-          energyStarRating: selectedDevice.energyStarRating,
-          ...selectedDevice.additionalSpecs,
-        },
-      });
-
-      if (response.device) {
-        setAddedDevice(response.device);
-        // Instead of closing, move to survey
-        setStage("survey");
-      } else {
-        setError("Failed to add device. Please try again.");
-        setStage("results");
-      }
-    } catch (err) {
-      console.error("Failed to add devices:", err);
-      setError("Failed to add devices. Please try again.");
-      setStage("results");
-    } finally {
-      setIsAdding(false);
-    }
+    // Just move to survey stage, defer API call
+    setStage("survey");
   };
 
   const toggleUsageTime = (time: string) => {
@@ -134,24 +105,44 @@ export default function AddDeviceModal({ isOpen, onClose, onAdd }: AddDeviceModa
   };
 
   const handleCompleteSurvey = async () => {
-    if (!addedDevice || !frequency || !hoursPerDay || usageTimes.length === 0 || !room) return;
+    if (!selectedDevice || !frequency || !hoursPerDay || usageTimes.length === 0 || !customName.trim()) return;
 
     setIsSubmittingSurvey(true);
     try {
-      await submitSurvey(addedDevice.id, {
+      // 1. Add Device
+      const addResponse = await addDevice({
+        brand: selectedDevice.brand,
+        modelNumber: selectedDevice.modelNumber,
+        productName: selectedDevice.productName,
+        deviceType: deviceType || selectedDevice.category,
+        room: room || "Unassigned", // Use selected room or default
+        customName: customName.trim(),
+        energyStarSpecs: {
+          annualEnergyUse: selectedDevice.annualEnergyUse,
+          energyStarRating: selectedDevice.energyStarRating,
+          ...selectedDevice.additionalSpecs,
+        },
+      });
+
+      if (!addResponse.device) {
+        throw new Error("Failed to create device");
+      }
+
+      // 2. Submit Survey
+      await submitSurvey(addResponse.device.id, {
         frequency,
         hoursPerDay: parseFloat(hoursPerDay),
         usageTimes,
-        room,
+        room: room || "Unassigned",
       });
 
-      // Now we finish the whole process
-      onAdd(addedDevice, addedDevice.id);
+      // 3. Finish
+      onAdd(addResponse.device, addResponse.device.id);
       resetModal();
       onClose();
     } catch (error) {
-      console.error("Error submitting survey:", error);
-      setError("Failed to save usage data. Please try again.");
+      console.error("Error adding device and survey:", error);
+      setError("Failed to save device. Please try again.");
     } finally {
       setIsSubmittingSurvey(false);
     }
@@ -179,7 +170,7 @@ export default function AddDeviceModal({ isOpen, onClose, onAdd }: AddDeviceModa
     { value: "other", label: "Other" },
   ];
 
-  const isSurveyValid = frequency && hoursPerDay && usageTimes.length > 0 && room;
+  const isSurveyValid = frequency && hoursPerDay && usageTimes.length > 0 && customName.trim();
 
   return (
     <AnimatePresence>
@@ -246,7 +237,7 @@ export default function AddDeviceModal({ isOpen, onClose, onAdd }: AddDeviceModa
                           <button
                             key={type.value}
                             onClick={() => setDeviceType(type.value)}
-                            className={`flex items-center gap-2 px-4 py-3 rounded-xl border-2 transition-all ${isSelected
+                            className={`flex items-center gap-2 px-4 py-3 rounded-xl border-2 shadow-lg hover:shadow-xl transition-all ${isSelected
                               ? "border-black bg-black text-white"
                               : "border-white/60 bg-white/40 hover:bg-white/50"
                               }`}
@@ -268,7 +259,7 @@ export default function AddDeviceModal({ isOpen, onClose, onAdd }: AddDeviceModa
                       value={brand}
                       onChange={(e) => setBrand(e.target.value)}
                       placeholder="e.g., Samsung, LG, Philips"
-                      className="w-full px-4 py-3 bg-white/50 backdrop-blur-sm border border-white/60 rounded-2xl text-sm focus:outline-none focus:border-black/30 transition-colors"
+                      className="w-full px-4 py-3 bg-white/50 backdrop-blur-sm border border-white/60 rounded-2xl text-sm shadow-lg focus:outline-none focus:border-black/30 transition-colors"
                     />
                   </div>
 
@@ -279,7 +270,7 @@ export default function AddDeviceModal({ isOpen, onClose, onAdd }: AddDeviceModa
                       value={model}
                       onChange={(e) => setModel(e.target.value)}
                       placeholder="e.g., AR12C, RT38K"
-                      className="w-full px-4 py-3 bg-white/50 backdrop-blur-sm border border-white/60 rounded-2xl text-sm focus:outline-none focus:border-black/30 transition-colors"
+                      className="w-full px-4 py-3 bg-white/50 backdrop-blur-sm border border-white/60 rounded-2xl text-sm shadow-lg focus:outline-none focus:border-black/30 transition-colors"
                     />
                   </div>
 
@@ -351,11 +342,6 @@ export default function AddDeviceModal({ isOpen, onClose, onAdd }: AddDeviceModa
                                     {device.annualEnergyUse} kWh/year
                                   </span>
                                 )}
-                                {device.energyStarRating && (
-                                  <span className="text-green-600 font-medium">
-                                    {device.energyStarRating}
-                                  </span>
-                                )}
                               </div>
                             </div>
                             {isSelected && (
@@ -383,7 +369,7 @@ export default function AddDeviceModal({ isOpen, onClose, onAdd }: AddDeviceModa
                     className="flex-1 bg-black text-white py-3.5 rounded-full text-sm tracking-wide hover:bg-black/90 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                     whileTap={{ scale: 0.98 }}
                   >
-                    {isAdding ? "Adding Device..." : "Add Device"}
+                    {isAdding ? "Adding Device..." : "Select Device"}
                   </motion.button>
                 </div>
               </>
@@ -398,9 +384,23 @@ export default function AddDeviceModal({ isOpen, onClose, onAdd }: AddDeviceModa
                     animate={{ opacity: 1, y: 0 }}
                     className="space-y-6"
                   >
-                    {/* Frequency */}
+                    {/* Device Name */}
                     <div>
                       <label className="block text-xs text-black/60 pt-6 mb-2 tracking-wide">
+                        Device Name <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={customName}
+                        onChange={(e) => setCustomName(e.target.value)}
+                        placeholder="e.g., Living Room TV, Master Bedroom AC"
+                        className="w-full px-4 py-3 bg-white/50 backdrop-blur-sm border border-white/60 rounded-xl text-sm shadow-lg focus:outline-none focus:border-black/30"
+                      />
+                    </div>
+
+                    {/* Frequency */}
+                    <div>
+                      <label className="block text-xs text-black/60 mb-2 tracking-wide">
                         How often do you use this device?
                       </label>
                       <div className="grid grid-cols-2 gap-2">
@@ -408,7 +408,7 @@ export default function AddDeviceModal({ isOpen, onClose, onAdd }: AddDeviceModa
                           <button
                             key={option.value}
                             onClick={() => setFrequency(option.value)}
-                            className={`p-3 rounded-xl text-xs transition-all border ${frequency === option.value
+                            className={`p-3 rounded-xl text-xs shadow-lg hover:shadow-xl transition-all border ${frequency === option.value
                               ? "bg-black text-white border-black"
                               : "bg-white/40 border-white/60 hover:bg-white/50"
                               }`}
@@ -428,10 +428,15 @@ export default function AddDeviceModal({ isOpen, onClose, onAdd }: AddDeviceModa
                         type="number"
                         value={hoursPerDay}
                         onChange={(e) => setHoursPerDay(e.target.value)}
-                        placeholder="e.g., 8"
+                        onBlur={() => {
+                          const val = parseFloat(hoursPerDay);
+                          if (val < 0) setHoursPerDay("0");
+                          if (val > 24) setHoursPerDay("24");
+                        }}
+                        placeholder="e.g., 8(hours), 0.2(20 minutes)"
                         min="0"
                         max="24"
-                        className="w-full px-4 py-3 bg-white/50 backdrop-blur-sm border border-white/60 rounded-xl text-sm focus:outline-none focus:border-black/30"
+                        className="w-full px-4 py-3 bg-white/50 backdrop-blur-sm border border-white/60 rounded-xl text-sm shadow-lg focus:outline-none focus:border-black/30"
                       />
                     </div>
 
@@ -447,7 +452,7 @@ export default function AddDeviceModal({ isOpen, onClose, onAdd }: AddDeviceModa
                             <button
                               key={option.value}
                               onClick={() => toggleUsageTime(option.value)}
-                              className={`p-3 rounded-xl text-xs flex items-center justify-between transition-all border ${isSelected
+                              className={`p-3 rounded-xl text-xs flex items-center justify-between shadow-lg hover:shadow-xl transition-all border ${isSelected
                                 ? "bg-black text-white border-black"
                                 : "bg-white/40 border-white/60 hover:bg-white/50"
                                 }`}
@@ -463,14 +468,14 @@ export default function AddDeviceModal({ isOpen, onClose, onAdd }: AddDeviceModa
                     {/* Room */}
                     <div>
                       <label className="block text-xs text-black/60 mb-2 tracking-wide">
-                        Location
+                        Location (Optional)
                       </label>
                       <div className="grid grid-cols-2 gap-2">
                         {roomOptions.map((option) => (
                           <button
                             key={option.value}
                             onClick={() => setRoom(option.value)}
-                            className={`p-3 rounded-xl text-xs transition-all border ${room === option.value
+                            className={`p-3 rounded-xl text-xs shadow-lg hover:shadow-xl transition-all border ${room === option.value
                               ? "bg-black text-white border-black"
                               : "bg-white/40 border-white/60 hover:bg-white/50"
                               }`}
@@ -483,14 +488,20 @@ export default function AddDeviceModal({ isOpen, onClose, onAdd }: AddDeviceModa
                   </motion.div>
                 </div>
 
-                <div className="px-6 py-4 flex-shrink-0">
+                <div className="px-6 py-4 flex-shrink-0 flex gap-3">
+                  <button
+                    onClick={() => setStage("results")}
+                    className="flex-1 py-3.5 bg-white/60 backdrop-blur-xl border border-white/60 text-black rounded-full text-sm tracking-wide hover:bg-white/70 transition-colors"
+                  >
+                    Back
+                  </button>
                   <motion.button
                     onClick={handleCompleteSurvey}
                     disabled={!isSurveyValid || isSubmittingSurvey}
-                    className="w-full bg-black text-white py-3.5 rounded-full text-sm tracking-wide hover:bg-black/90 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                    className="flex-1 bg-black text-white py-3.5 rounded-full text-sm tracking-wide hover:bg-black/90 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                     whileTap={{ scale: 0.98 }}
                   >
-                    {isSubmittingSurvey ? "Saving..." : "Complete & Add Device"}
+                    {isSubmittingSurvey ? "Adding..." : "Add Device"}
                   </motion.button>
                 </div>
               </>
