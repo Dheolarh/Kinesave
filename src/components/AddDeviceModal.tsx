@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { X, Wind, Droplets, Flame, Fan, Search, Check, Zap } from "lucide-react";
-import { searchDevices, addDevice, type EnergyStarDevice } from "../utils/api";
+import { searchDevices, addDevice, submitSurvey, type EnergyStarDevice } from "../utils/api";
 
 interface AddDeviceModalProps {
   isOpen: boolean;
@@ -19,15 +19,23 @@ const DEVICE_TYPES = [
 ];
 
 export default function AddDeviceModal({ isOpen, onClose, onAdd }: AddDeviceModalProps) {
-  const [stage, setStage] = useState<"form" | "results" | "adding">("form");
+  const [stage, setStage] = useState<"form" | "results" | "adding" | "survey">("form");
   const [deviceType, setDeviceType] = useState("");
   const [brand, setBrand] = useState("");
   const [model, setModel] = useState("");
   const [searchResults, setSearchResults] = useState<any[]>([]);
-  const [selectedDevices, setSelectedDevices] = useState<any[]>([]);
+  const [selectedDevice, setSelectedDevice] = useState<any | null>(null);
+  const [addedDevice, setAddedDevice] = useState<any | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Survey State
+  const [frequency, setFrequency] = useState("");
+  const [hoursPerDay, setHoursPerDay] = useState("");
+  const [usageTimes, setUsageTimes] = useState<string[]>([]);
+  const [room, setRoom] = useState("");
+  const [isSubmittingSurvey, setIsSubmittingSurvey] = useState(false);
 
   const resetModal = () => {
     setStage("form");
@@ -35,8 +43,15 @@ export default function AddDeviceModal({ isOpen, onClose, onAdd }: AddDeviceModa
     setBrand("");
     setModel("");
     setSearchResults([]);
-    setSelectedDevices([]);
+    setSelectedDevice(null);
+    setAddedDevice(null);
     setError(null);
+
+    // Reset Survey
+    setFrequency("");
+    setHoursPerDay("");
+    setUsageTimes([]);
+    setRoom("");
   };
 
   const handleSearch = async () => {
@@ -70,57 +85,101 @@ export default function AddDeviceModal({ isOpen, onClose, onAdd }: AddDeviceModa
   };
 
   const handleSelectDevice = (device: EnergyStarDevice) => {
-    setSelectedDevices(prev => {
-      const isSelected = prev.some(d => d.modelNumber === device.modelNumber);
-      if (isSelected) {
-        return prev.filter(d => d.modelNumber !== device.modelNumber);
-      } else {
-        return [...prev, device];
-      }
-    });
+    setSelectedDevice(device);
   };
 
   const handleAddDevice = async () => {
-    if (selectedDevices.length === 0) return;
+    if (!selectedDevice) return;
 
     setIsAdding(true);
-    setStage("adding"); // Set stage to adding to show loading indicator
+    setStage("adding");
 
     try {
-      // Add all selected devices
-      for (const device of selectedDevices) {
-        const response = await addDevice({
-          brand: device.brand,
-          modelNumber: device.modelNumber,
-          productName: device.productName,
-          deviceType: deviceType || device.category,
-          room: "", // Will be set in survey
-          energyStarSpecs: {
-            annualEnergyUse: device.annualEnergyUse,
-            energyStarRating: device.energyStarRating,
-            ...device.additionalSpecs,
-          },
-        });
+      const response = await addDevice({
+        brand: selectedDevice.brand,
+        modelNumber: selectedDevice.modelNumber,
+        productName: selectedDevice.productName,
+        deviceType: deviceType || selectedDevice.category,
+        room: "",
+        energyStarSpecs: {
+          annualEnergyUse: selectedDevice.annualEnergyUse,
+          energyStarRating: selectedDevice.energyStarRating,
+          ...selectedDevice.additionalSpecs,
+        },
+      });
 
-        // Convert to format expected by parent
-        onAdd({
-          id: response.device.id,
-          name: device.productName,
-          type: deviceType || "ac",
-          power: device.additionalSpecs?.powerRatingW || 0,
-        }, response.device.id); // Pass deviceId for navigation
+      if (response.device) {
+        setAddedDevice(response.device);
+        // Instead of closing, move to survey
+        setStage("survey");
+      } else {
+        setError("Failed to add device. Please try again.");
+        setStage("results");
       }
-
-      resetModal();
-      onClose();
     } catch (err) {
       console.error("Failed to add devices:", err);
       setError("Failed to add devices. Please try again.");
-      setStage("results"); // Go back to results if error
+      setStage("results");
     } finally {
       setIsAdding(false);
     }
   };
+
+  const toggleUsageTime = (time: string) => {
+    setUsageTimes(prev =>
+      prev.includes(time)
+        ? prev.filter(t => t !== time)
+        : [...prev, time]
+    );
+  };
+
+  const handleCompleteSurvey = async () => {
+    if (!addedDevice || !frequency || !hoursPerDay || usageTimes.length === 0 || !room) return;
+
+    setIsSubmittingSurvey(true);
+    try {
+      await submitSurvey(addedDevice.id, {
+        frequency,
+        hoursPerDay: parseFloat(hoursPerDay),
+        usageTimes,
+        room,
+      });
+
+      // Now we finish the whole process
+      onAdd(addedDevice, addedDevice.id);
+      resetModal();
+      onClose();
+    } catch (error) {
+      console.error("Error submitting survey:", error);
+      setError("Failed to save usage data. Please try again.");
+    } finally {
+      setIsSubmittingSurvey(false);
+    }
+  };
+
+  const frequencyOptions = [
+    { value: "daily", label: "Daily" },
+    { value: "few_times_per_week", label: "Few times/week" },
+    { value: "rarely", label: "Rarely" },
+    { value: "seasonal", label: "Seasonal" },
+  ];
+
+  const timeOptions = [
+    { value: "morning", label: "Morning" },
+    { value: "afternoon", label: "Afternoon" },
+    { value: "evening", label: "Evening" },
+    { value: "night", label: "Night" },
+  ];
+
+  const roomOptions = [
+    { value: "living_room", label: "Living Room" },
+    { value: "bedroom", label: "Bedroom" },
+    { value: "kitchen", label: "Kitchen" },
+    { value: "office", label: "Office" },
+    { value: "other", label: "Other" },
+  ];
+
+  const isSurveyValid = frequency && hoursPerDay && usageTimes.length > 0 && room;
 
   return (
     <AnimatePresence>
@@ -148,7 +207,10 @@ export default function AddDeviceModal({ isOpen, onClose, onAdd }: AddDeviceModa
             <div className="px-6 pt-6 pb-4 flex-shrink-0">
               <div className="flex items-center justify-between">
                 <h2 className="text-xl tracking-tight">
-                  {stage === "form" ? "Add Device" : stage === "results" ? "Select Device" : "Adding Devices"}
+                  {stage === "form" ? "Add Device" :
+                    stage === "results" ? "Select Device" :
+                      stage === "survey" ? "Device Usage" :
+                        "Adding Devices"}
                 </h2>
                 <button
                   onClick={() => {
@@ -172,7 +234,7 @@ export default function AddDeviceModal({ isOpen, onClose, onAdd }: AddDeviceModa
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="space-y-4"
+                  className="space-y-4 pb-6"
                 >
                   <div>
                     <label className="text-sm text-black/60 mb-2 block">Device Type</label>
@@ -255,18 +317,16 @@ export default function AddDeviceModal({ isOpen, onClose, onAdd }: AddDeviceModa
             {/* Search Results - Outside scrollable content */}
             {stage === "results" && (
               <>
-                {/* Fixed: Found count */}
                 <div className="px-6 py-1 flex-shrink-0">
                   <p className="text-sm text-black/60 mb-2">
-                    Found {searchResults.length} device(s). Select one or more to add.
+                    Found {searchResults.length} device(s).
                   </p>
                 </div>
 
-                {/* Scrollable: Device list */}
-                <div className="px-6 py-2 flex-1 overflow-y-auto scrollbar-hide" style={{ minHeight: 0 }}>
+                <div className="px-6 py-2 pb-6 flex-1 overflow-y-auto scrollbar-hide" style={{ minHeight: 0 }}>
                   <div className="space-y-2">
                     {searchResults.map((device, index) => {
-                      const isSelected = selectedDevices.some(d => d.modelNumber === device.modelNumber);
+                      const isSelected = selectedDevice?.modelNumber === device.modelNumber;
                       return (
                         <motion.button
                           key={index}
@@ -310,7 +370,6 @@ export default function AddDeviceModal({ isOpen, onClose, onAdd }: AddDeviceModa
                   </div>
                 </div>
 
-                {/* Fixed: Action buttons */}
                 <div className="px-6 py-4 flex-shrink-0 flex gap-3">
                   <button
                     onClick={() => setStage("form")}
@@ -320,19 +379,124 @@ export default function AddDeviceModal({ isOpen, onClose, onAdd }: AddDeviceModa
                   </button>
                   <motion.button
                     onClick={handleAddDevice}
-                    disabled={selectedDevices.length === 0 || isAdding}
+                    disabled={!selectedDevice || isAdding}
                     className="flex-1 bg-black text-white py-3.5 rounded-full text-sm tracking-wide hover:bg-black/90 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                     whileTap={{ scale: 0.98 }}
                   >
-                    {isAdding
-                      ? "Adding Devices..."
-                      : `Add ${selectedDevices.length} Device${selectedDevices.length !== 1 ? 's' : ''}`}
+                    {isAdding ? "Adding Device..." : "Add Device"}
                   </motion.button>
                 </div>
               </>
             )}
 
-            {/* Adding State - Outside scrollable content */}
+            {/* Survey Stage */}
+            {stage === "survey" && (
+              <>
+                <div className="px-6 flex-1 overflow-y-auto scrollbar-hide pb-6" style={{ minHeight: 0 }}>
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="space-y-6"
+                  >
+                    {/* Frequency */}
+                    <div>
+                      <label className="block text-xs text-black/60 pt-6 mb-2 tracking-wide">
+                        How often do you use this device?
+                      </label>
+                      <div className="grid grid-cols-2 gap-2">
+                        {frequencyOptions.map((option) => (
+                          <button
+                            key={option.value}
+                            onClick={() => setFrequency(option.value)}
+                            className={`p-3 rounded-xl text-xs transition-all border ${frequency === option.value
+                              ? "bg-black text-white border-black"
+                              : "bg-white/40 border-white/60 hover:bg-white/50"
+                              }`}
+                          >
+                            {option.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Hours */}
+                    <div>
+                      <label className="block text-xs text-black/60 mb-2 tracking-wide">
+                        Hours per day (0-24)
+                      </label>
+                      <input
+                        type="number"
+                        value={hoursPerDay}
+                        onChange={(e) => setHoursPerDay(e.target.value)}
+                        placeholder="e.g., 8"
+                        min="0"
+                        max="24"
+                        className="w-full px-4 py-3 bg-white/50 backdrop-blur-sm border border-white/60 rounded-xl text-sm focus:outline-none focus:border-black/30"
+                      />
+                    </div>
+
+                    {/* Times */}
+                    <div>
+                      <label className="block text-xs text-black/60 mb-2 tracking-wide">
+                        Typical usage time
+                      </label>
+                      <div className="grid grid-cols-2 gap-2">
+                        {timeOptions.map((option) => {
+                          const isSelected = usageTimes.includes(option.value);
+                          return (
+                            <button
+                              key={option.value}
+                              onClick={() => toggleUsageTime(option.value)}
+                              className={`p-3 rounded-xl text-xs flex items-center justify-between transition-all border ${isSelected
+                                ? "bg-black text-white border-black"
+                                : "bg-white/40 border-white/60 hover:bg-white/50"
+                                }`}
+                            >
+                              <span>{option.label}</span>
+                              {isSelected && <Check className="w-3 h-3" />}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Room */}
+                    <div>
+                      <label className="block text-xs text-black/60 mb-2 tracking-wide">
+                        Location
+                      </label>
+                      <div className="grid grid-cols-2 gap-2">
+                        {roomOptions.map((option) => (
+                          <button
+                            key={option.value}
+                            onClick={() => setRoom(option.value)}
+                            className={`p-3 rounded-xl text-xs transition-all border ${room === option.value
+                              ? "bg-black text-white border-black"
+                              : "bg-white/40 border-white/60 hover:bg-white/50"
+                              }`}
+                          >
+                            {option.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </motion.div>
+                </div>
+
+                <div className="px-6 py-4 flex-shrink-0">
+                  <motion.button
+                    onClick={handleCompleteSurvey}
+                    disabled={!isSurveyValid || isSubmittingSurvey}
+                    className="w-full bg-black text-white py-3.5 rounded-full text-sm tracking-wide hover:bg-black/90 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    {isSubmittingSurvey ? "Saving..." : "Complete & Add Device"}
+                  </motion.button>
+                </div>
+              </>
+            )}
+
+            {/* Adding State */}
             {stage === "adding" && (
               <motion.div
                 initial={{ opacity: 0 }}

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
-import { motion } from "motion/react";
+import { motion, AnimatePresence, useMotionValue, useTransform } from "motion/react";
+import { Trash2 } from "lucide-react";
 import AddDeviceModal from "../components/AddDeviceModal";
 import { getLocationFromStorage, type LocationData } from "../utils/location";
 
@@ -99,22 +100,69 @@ export default function EnergyCostSetup() {
     ? `${locationData.city}${locationData.region ? `, ${locationData.region}` : ""}`
     : "Unknown Location";
 
+  // Load saved data on mount
+  useEffect(() => {
+    const savedEnergyData = localStorage.getItem("energyData");
+    const savedDevices = localStorage.getItem("userDevices");
+
+    if (savedEnergyData) {
+      const { monthlyCost, pricePerKwh } = JSON.parse(savedEnergyData);
+      setMonthlyCost(monthlyCost || "");
+      setPricePerKwh(pricePerKwh || "");
+    }
+
+    if (savedDevices) {
+      setSelectedDevices(JSON.parse(savedDevices));
+    }
+  }, []);
+
+  const handleRemoveDevice = (indexToRemove: number) => {
+    const updatedDevices = selectedDevices.filter((_, index) => index !== indexToRemove);
+    setSelectedDevices(updatedDevices);
+    localStorage.setItem("userDevices", JSON.stringify(updatedDevices));
+  };
+
   const handleAddDevices = (device: any, deviceId?: string) => {
     // Check if device already exists to avoid duplicates
-    setSelectedDevices((prev) => {
-      const exists = prev.find(d => d.name === device.name);
-      if (exists) {
-        return prev;
-      }
-      const updatedDevices = [...prev, { ...device, deviceId }];
+    if (selectedDevices.find(d => d.name === device.name)) {
+      return;
+    }
 
-      // If this is the first device, navigate to survey
-      if (prev.length === 0 && deviceId) {
-        navigate("/usage-survey", { state: { device: { ...device, id: deviceId } } });
-      }
+    // Map backend device to local format if needed
+    // The backend device likely has productName, brand, etc.
+    // EnergyCostSetup expects { name, power, ... }
+    const newDevice = {
+      ...device,
+      name: device.productName || device.name, // Handle both formats
+      power: device.additionalSpecs?.powerRatingW || device.power || 0,
+      deviceId
+    };
 
-      return updatedDevices;
-    });
+    const updatedDevices = [...selectedDevices, newDevice];
+    setSelectedDevices(updatedDevices);
+
+    // Save state to localStorage before navigating
+    localStorage.setItem("userDevices", JSON.stringify(updatedDevices));
+    localStorage.setItem("energyData", JSON.stringify({
+      monthlyCost,
+      pricePerKwh,
+      currency: currency.code,
+      currencySymbol: currency.symbol,
+      location: locationDisplay,
+    }));
+
+    // Always navigate to survey for the new device
+    // Use deviceId passed from modal, or fall back to device.id
+    // const targetId = deviceId || device.id;
+
+    // if (targetId) {
+    //   // Small delay to ensure state is saved
+    //   setTimeout(() => {
+    //     navigate("/usage-survey", { state: { device: { ...newDevice, id: targetId } } });
+    //   }, 100);
+    // } else {
+    //   console.error("No device ID available for navigation");
+    // }
   };
 
   const handleProceedToDashboard = () => {
@@ -232,9 +280,12 @@ export default function EnergyCostSetup() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.25 }}
         >
-          <label className="block text-xs text-black/60 mb-3 tracking-wide px-1">
+          <label className="block text-xs text-black/60 mb-1 tracking-wide px-1">
             YOUR DEVICES
           </label>
+          <p className="text-xs text-black/40 mb-3 px-1">
+            Swipe a device right to remove it
+          </p>
 
           {selectedDevices.length === 0 ? (
             <div className="bg-white/30 backdrop-blur-sm border border-white/60 rounded-2xl p-6 text-center">
@@ -242,19 +293,16 @@ export default function EnergyCostSetup() {
               <p className="text-xs text-black/40 mt-1">Scan to add your devices</p>
             </div>
           ) : (
-            <div className="space-y-2">
-              {selectedDevices.map((device, index) => (
-                <div
-                  key={index}
-                  className="bg-white/50 backdrop-blur-sm border border-white/60 rounded-2xl p-4 flex items-center justify-between"
-                >
-                  <div>
-                    <p className="text-sm">{device.name}</p>
-                    <p className="text-xs text-black/50">{device.power}W</p>
-                  </div>
-                  <div className="w-2 h-2 bg-green-500 rounded-full" />
-                </div>
-              ))}
+            <div className="space-y-2 overflow-hidden">
+              <AnimatePresence mode="popLayout">
+                {selectedDevices.map((device, index) => (
+                  <SwipeableDeviceItem
+                    key={device.deviceId || device.name} // Use stable ID
+                    device={device}
+                    onRemove={() => handleRemoveDevice(index)}
+                  />
+                ))}
+              </AnimatePresence>
             </div>
           )}
         </motion.div>
@@ -294,5 +342,46 @@ export default function EnergyCostSetup() {
         onAdd={handleAddDevices}
       />
     </div>
+  );
+}
+
+function SwipeableDeviceItem({ device, onRemove }: { device: any, onRemove: () => void }) {
+  const x = useMotionValue(0);
+  const opacity = useTransform(x, [0, 100], [1, 0]);
+  const backgroundOpacity = useTransform(x, [0, 100], [0, 1]);
+
+  return (
+    <motion.div
+      style={{ x, opacity }}
+      drag="x"
+      dragConstraints={{ left: 0, right: 1000 }} // Allow dragging right freely
+      dragElastic={0.1} // Add some resistance
+      onDragEnd={(_, info) => {
+        if (info.offset.x > 100) {
+          onRemove();
+        }
+      }}
+      layout // Enable layout animations for siblings
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0, x: 0 }} // Reset x position
+      exit={{ opacity: 0, x: 300, transition: { duration: 0.2 } }} // Smooth exit to right
+      className="relative touch-pan-y"
+    >
+      {/* Background for swipe action */}
+      <motion.div
+        className="absolute inset-0 bg-red-500 rounded-2xl flex items-center justify-start pl-4"
+        style={{ opacity: backgroundOpacity, zIndex: -1 }}
+      >
+        <Trash2 className="w-5 h-5 text-white" />
+      </motion.div>
+
+      <div className="bg-white/50 backdrop-blur-sm border border-white/60 rounded-2xl p-4 flex items-center justify-between relative z-10">
+        <div>
+          <p className="text-sm">{device.name}</p>
+          <p className="text-xs text-black/50">{device.power}W</p>
+        </div>
+        <div className="w-2 h-2 bg-green-500 rounded-full" />
+      </div>
+    </motion.div>
   );
 }
