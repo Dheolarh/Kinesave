@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
-import { Plus, Wind, Droplets, Flame, Fan, CloudSun } from "lucide-react";
 import BottomNav from "../components/BottomNav";
 import FloatingAIRing from "../components/FloatingAIRing";
 import AddDeviceModal from "../components/AddDeviceModal";
 import { getUserDevices } from "../utils/api";
 import { getLocationFromStorage } from "../utils/location";
+import { Plus, Wind, Droplets, Flame, Fan, CloudSun, Tv, Zap } from "lucide-react";
 import { motion } from "motion/react";
 
 const iconMap = {
@@ -15,6 +15,9 @@ const iconMap = {
   refrigerator: Droplets,
   heater: Flame,
   fan: Fan,
+  tv: Tv,
+  washing_machine: Fan,
+  led_bulb: Zap,
 };
 
 export default function Dashboard() {
@@ -125,7 +128,7 @@ export default function Dashboard() {
 
           {/* Device Cards */}
           {devices.map((device, index) => {
-            const Icon = iconMap[device.type as keyof typeof iconMap];
+            const Icon = iconMap[device.deviceType as keyof typeof iconMap] || iconMap[device.type as keyof typeof iconMap] || Zap;
             return (
               <motion.button
                 key={device.id}
@@ -144,8 +147,7 @@ export default function Dashboard() {
                   <Icon className="w-6 h-6" strokeWidth={1.5} />
                 </div>
                 <div className="flex-1 flex flex-col justify-center">
-                  <div className="text-xs tracking-wide mb-1 line-clamp-2">{device.name}</div>
-                  <div className="text-xs text-black/50">{device.power}W</div>
+                  <div className="text-xs tracking-wide mb-1 line-clamp-2">{device.customName || device.name}</div>
                 </div>
               </motion.button>
             );

@@ -4,10 +4,11 @@ import devicesController from '../controllers/devices.controller';
 const router = Router();
 
 // Device search and management routes
-router.post('/search', devicesController.searchDevices);
-router.post('/', devicesController.addDevice);
-router.get('/', devicesController.getDevices);
-router.patch('/:id', devicesController.updateDevice);
-router.delete('/:id', devicesController.deleteDevice);
+// Device search and management routes
+router.post('/search', (req, res) => devicesController.searchDevices(req, res));
+router.post('/', (req, res) => devicesController.addDevice(req, res));
+router.get('/', (req, res) => devicesController.getDevices(req, res));
+router.patch('/:id', (req, res) => devicesController.updateDevice(req, res));
+router.delete('/:id', (req, res) => devicesController.deleteDevice(req, res));
 
 export default router;

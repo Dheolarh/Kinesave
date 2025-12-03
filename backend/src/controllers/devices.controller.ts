@@ -2,6 +2,9 @@ import { Request, Response } from 'express';
 import deviceSpecsService from '../services/energy-star.service';
 
 class DevicesController {
+    // In-memory storage for devices (temporary)
+    private devices: any[] = [];
+
     /**
      * Search Energy Star database for devices
      * POST /api/devices/search
@@ -52,8 +55,7 @@ class DevicesController {
                 energyStarSpecs,
             } = req.body;
 
-            // TODO: Save to database
-            // For now, return success with mock data
+            // Save to in-memory storage
             const device = {
                 id: `dev_${Date.now()}`,
                 userId: 'user123', // TODO: Get from auth middleware when implemented
@@ -65,7 +67,11 @@ class DevicesController {
                 customName: customName || productName,
                 energyStarSpecs,
                 createdAt: new Date().toISOString(),
+                status: 'active', // Default status
+                power: energyStarSpecs?.powerRatingW || 0, // Extract power for dashboard
             };
+
+            this.devices.push(device);
 
             return res.status(201).json({
                 message: 'Device added successfully',
@@ -88,13 +94,9 @@ class DevicesController {
         try {
             const userId = 'user123'; // TODO: Get from auth middleware when implemented
 
-            // TODO: Fetch from database
-            // For now, return empty array
-            const devices: any[] = [];
-
             return res.json({
-                devices,
-                count: devices.length,
+                devices: this.devices,
+                count: this.devices.length,
             });
         } catch (error: any) {
             console.error('Get devices error:', error);
