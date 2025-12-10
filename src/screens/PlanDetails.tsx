@@ -240,44 +240,41 @@ export default function PlanDetails() {
         </div>
 
         <div>
-        <h2 className="text-xs tracking-wide text-black/60 mb-3">DAILY USAGE PATTERN</h2>
-        <motion.div
+          <h2 className="text-xs tracking-wide text-black/60 mb-3">DAILY USAGE PATTERN</h2>
+          <motion.div
             className="bg-white/60 backdrop-blur-xl border border-white/60 rounded-2xl p-5 shadow-lg"
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3 }}
-        >
+          >
             <Calendar
-            mode="single"
-            selected={selectedDate}
-            onSelect={handleDateSelect}
-            className="w-full"
-            classNames={{
+              mode="single"
+              selected={selectedDate}
+              onSelect={handleDateSelect}
+              className="w-full"
+              classNames={{
                 months: "flex flex-col w-full",
                 month: "w-full",
                 caption: "flex justify-center pt-1 relative items-center w-full mb-4",
-                caption_label: "text-sm font-medium",
+                caption_label: "text-sm",
                 nav: "flex items-center gap-1",
-                nav_button: "size-7 bg-transparent p-0 opacity-50 hover:opacity-100 border border-black/10 rounded-lg",
-                nav_button_previous: "absolute left-1",
-                nav_button_next: "absolute right-1",
                 table: "w-full border-collapse",
                 head_row: "flex w-full",
-                head_cell: "text-black/50 rounded-md w-full text-xs font-normal",
+                head_cell: "text-black/50 rounded-md w-full text-xs",
                 row: "flex w-full mt-2",
                 cell: "relative p-0 text-center text-sm focus-within:relative focus-within:z-20 flex-1",
-                day: "h-9 w-full p-0 hover:bg-black/5 rounded-lg transition-colors font-normal",
-                day_selected: "bg-black/10 text-black hover:bg-black/15 font-medium",
-                day_today: "bg-black text-white font-medium",
-                day_outside: "text-black/30 opacity-50",
-                day_disabled: "text-black/20 opacity-30",
-            }}
+                day: "h-9 w-full p-0 hover:bg-black/5 rounded-lg transition-colors",
+                day_selected: "bg-black/10 text-black hover:bg-black/10 hover:text-black",
+                day_today: "bg-black text-white border border-black",
+                day_outside: "text-black/30",
+              }}
             />
             <p className="text-xs text-black/50 text-center mt-4">
-            Tap a date to view usage plan
+              Tap a date to view usage plan
             </p>
-        </motion.div>
+          </motion.div>
         </div>
+
         <div>
           <h2 className="text-xs tracking-wide text-black/60 mb-3">SMART ALERTS</h2>
           <div className="space-y-2">
