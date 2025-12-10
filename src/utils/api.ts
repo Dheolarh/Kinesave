@@ -3,15 +3,15 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api';
 
 export interface MatterDevice {
-    id: string;
-    name: string;
-    type: string;
-    power?: number;
-    status: 'active' | 'inactive';
-    vendorId?: string;
-    productId?: string;
-    discriminator?: string;
-    port?: number;
+  id: string;
+  name: string;
+  type: string;
+  power?: number;
+  status: 'active' | 'inactive';
+  vendorId?: string;
+  productId?: string;
+  discriminator?: string;
+  port?: number;
 }
 
 export interface EnergyStarDevice {
@@ -46,11 +46,11 @@ export async function searchDevices(query: {
       },
       body: JSON.stringify(query),
     });
-    
+
     if (!response.ok) {
       throw new Error('Failed to search devices');
     }
-    
+
     return await response.json();
   } catch (error) {
     console.error('Error searching devices:', error);
@@ -78,14 +78,39 @@ export async function addDevice(device: {
       },
       body: JSON.stringify(device),
     });
-    
+
     if (!response.ok) {
       throw new Error('Failed to add device');
     }
-    
+
     return await response.json();
   } catch (error) {
     console.error('Error adding device:', error);
+    throw error;
+  }
+}
+
+/**
+ * Update device
+ * PATCH /api/devices/:id
+ */
+export async function updateDevice(deviceId: string, updates: any): Promise<any> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/devices/${deviceId}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(updates),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to update device');
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error updating device:', error);
     throw error;
   }
 }
@@ -139,11 +164,11 @@ export async function submitSurvey(deviceId: string, answers: {
       },
       body: JSON.stringify(answers),
     });
-    
+
     if (!response.ok) {
       throw new Error('Failed to submit survey');
     }
-    
+
     return await response.json();
   } catch (error) {
     console.error('Error submitting survey:', error);

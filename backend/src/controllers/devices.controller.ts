@@ -116,12 +116,24 @@ class DevicesController {
             const { id } = req.params;
             const updates = req.body;
 
-            // TODO: Update in database
+            // Find and update device in in-memory storage
+            const deviceIndex = this.devices.findIndex(d => d.id === id);
+
+            if (deviceIndex === -1) {
+                return res.status(404).json({
+                    error: 'Device not found',
+                });
+            }
+
+            // Update device with new data
+            this.devices[deviceIndex] = {
+                ...this.devices[deviceIndex],
+                ...updates,
+            };
 
             return res.json({
                 message: 'Device updated successfully',
-                deviceId: id,
-                updates,
+                device: this.devices[deviceIndex],
             });
         } catch (error: any) {
             console.error('Update device error:', error);

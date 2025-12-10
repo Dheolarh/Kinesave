@@ -3,7 +3,7 @@ import { ArrowLeft, Wind, Droplets, Flame, Fan, TrendingDown, Zap, Thermometer, 
 import { motion, AnimatePresence } from "motion/react";
 import { useState, useEffect } from "react";
 import BottomNav from "../components/BottomNav";
-import { getUserDevices } from "../utils/api";
+import { getUserDevices, updateDevice } from "../utils/api";
 
 const iconMap = {
   ac: Wind,
@@ -73,19 +73,15 @@ export default function DeviceDetails() {
     return null;
   }
 
-  const handleSaveName = () => {
-    // Update device name in localStorage
-    const savedDevices = localStorage.getItem("userDevices");
-    if (savedDevices) {
-      const devices = JSON.parse(savedDevices);
-      const deviceIndex = parseInt(id || "1") - 1;
-      if (devices[deviceIndex]) {
-        devices[deviceIndex].name = deviceName;
-        localStorage.setItem("userDevices", JSON.stringify(devices));
-        setDevice({ ...device, name: deviceName });
-      }
+  const handleSaveName = async () => {
+    try {
+      // Update device name via API
+      await updateDevice(id!, { customName: deviceName });
+      setDevice({ ...device, customName: deviceName });
+      setShowEditModal(false);
+    } catch (error) {
+      console.error("Failed to update device name:", error);
     }
-    setShowEditModal(false);
   };
 
   const Icon = iconMap[device.type as keyof typeof iconMap] || Wind;
