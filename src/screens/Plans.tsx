@@ -2,7 +2,6 @@ import { useNavigate } from "react-router";
 import { motion } from "motion/react";
 import { TrendingDown, Leaf, Gauge } from "lucide-react";
 import BottomNav from "../components/BottomNav";
-import FloatingAIRing from "../components/FloatingAIRing";
 
 const plans = [
   {
@@ -86,7 +85,6 @@ export default function Plans() {
         ))}
       </div>
 
-      <FloatingAIRing onClick={() => navigate("/ai-analysis")} />
       <BottomNav active="plans" />
     </div>
   );

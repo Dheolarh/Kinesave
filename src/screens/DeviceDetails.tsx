@@ -1,14 +1,20 @@
 import { useParams, useNavigate } from "react-router";
-import { ArrowLeft, Wind, Droplets, Flame, Fan, TrendingDown, Zap, Thermometer, Edit2, X } from "lucide-react";
+import { ArrowLeft, Wind, Droplets, Flame, Fan, TrendingDown, Zap, Thermometer, Edit2, X, Tv } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { useState, useEffect } from "react";
 import BottomNav from "../components/BottomNav";
+import { getUserDevices } from "../utils/api";
 
 const iconMap = {
   ac: Wind,
+  air_conditioner: Wind,
   dehumidifier: Droplets,
+  refrigerator: Droplets,
   heater: Flame,
   fan: Fan,
+  tv: Tv,
+  washing_machine: Fan,
+  led_bulb: Zap,
 };
 
 // Helper function to calculate estimated costs based on power rating
@@ -17,7 +23,7 @@ const calculateDeviceCosts = (power: number, pricePerKwh: number) => {
   const dailyKwh = (power / 1000) * dailyUsageHours;
   const dailyCost = dailyKwh * pricePerKwh;
   const monthlyCost = dailyCost * 30;
-  
+
   return {
     dailyUsage: `${dailyUsageHours.toFixed(1)} hrs`,
     dailyCost: `$${dailyCost.toFixed(2)}`,
@@ -35,28 +41,32 @@ export default function DeviceDetails() {
   const [deviceName, setDeviceName] = useState("");
 
   useEffect(() => {
-    // Load device from localStorage
-    const savedDevices = localStorage.getItem("userDevices");
-    const energyData = localStorage.getItem("energyData");
-    
-    if (savedDevices) {
-      const devices = JSON.parse(savedDevices);
-      const deviceIndex = parseInt(id || "1") - 1;
-      const foundDevice = devices[deviceIndex];
-      
-      if (foundDevice) {
-        const pricePerKwh = energyData ? JSON.parse(energyData).pricePerKwh : 0.15;
-        const calculatedCosts = calculateDeviceCosts(foundDevice.power, parseFloat(pricePerKwh));
-        
-        setDevice({
-          ...foundDevice,
-          id,
-          status: "active",
-          ...calculatedCosts,
-        });
-        setDeviceName(foundDevice.name);
+    // Load device from backend API
+    const loadDevice = async () => {
+      try {
+        const result = await getUserDevices();
+        const foundDevice = result.devices?.find((d: any) => d.id === id);
+
+        if (foundDevice) {
+          const energyData = localStorage.getItem("energyData");
+          const pricePerKwh = energyData ? JSON.parse(energyData).pricePerKwh : 0.15;
+          const devicePower = foundDevice.power || foundDevice.energyStarSpecs?.powerRatingW || 0;
+          const calculatedCosts = calculateDeviceCosts(devicePower, parseFloat(pricePerKwh));
+
+          setDevice({
+            ...foundDevice,
+            power: devicePower,
+            type: foundDevice.deviceType || foundDevice.type,
+            status: "active",
+            ...calculatedCosts,
+          });
+          setDeviceName(foundDevice.customName || foundDevice.name);
+        }
+      } catch (error) {
+        console.error("Failed to load device:", error);
       }
-    }
+    };
+    loadDevice();
   }, [id]);
 
   if (!device) {
@@ -106,9 +116,8 @@ export default function DeviceDetails() {
             </div>
             <div className="flex items-center gap-2">
               <div
-                className={`w-2 h-2 rounded-full ${
-                  device.status === "active" ? "bg-green-500" : "bg-black/20"
-                }`}
+                className={`w-2 h-2 rounded-full ${device.status === "active" ? "bg-green-500" : "bg-black/20"
+                  }`}
               />
               <span className="text-xs text-black/60">
                 {device.status === "active" ? "Active" : "Inactive"}
@@ -120,7 +129,7 @@ export default function DeviceDetails() {
 
       <div className="px-5 py-6 space-y-4">
         <h2 className="text-xs tracking-wide text-black/60 mb-3">SPECIFICATIONS</h2>
-        
+
         <div className="grid grid-cols-2 gap-3">
           <motion.div
             className="bg-white/40 backdrop-blur-xl border border-white/60 rounded-2xl p-4 shadow-lg"
@@ -169,7 +178,7 @@ export default function DeviceDetails() {
 
       <div className="px-5 py-6 space-y-4">
         <h2 className="text-xs tracking-wide text-black/60 mb-3">COST ANALYSIS</h2>
-        
+
         <motion.div
           className="bg-white/40 backdrop-blur-xl border border-white/60 rounded-3xl p-5 shadow-lg"
           initial={{ opacity: 0, y: 10 }}

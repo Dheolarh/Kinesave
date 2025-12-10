@@ -1,14 +1,20 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { motion, AnimatePresence } from "motion/react";
-import { Check, Wind, Droplets, Flame, Fan, ArrowLeft } from "lucide-react";
+import { Check, Wind, Droplets, Flame, Fan, ArrowLeft, Tv, Zap } from "lucide-react";
 import Orb from "../components/Orb";
+import { getUserDevices } from "../utils/api";
 
 const iconMap = {
   ac: Wind,
+  air_conditioner: Wind,
   dehumidifier: Droplets,
+  refrigerator: Droplets,
   heater: Flame,
   fan: Fan,
+  tv: Tv,
+  washing_machine: Fan,
+  led_bulb: Zap,
 };
 
 const analysisSteps = [
@@ -25,19 +31,21 @@ export default function AIAnalysis() {
   const [selectedDevices, setSelectedDevices] = useState<string[]>([]);
   const [currentStep, setCurrentStep] = useState(0);
 
-  // Load user devices from localStorage
+  // Load user devices from backend API
   useEffect(() => {
-    const savedDevices = localStorage.getItem("userDevices");
-    if (savedDevices) {
-      const parsedDevices = JSON.parse(savedDevices);
-      const devicesWithIds = parsedDevices.map((device: any, index: number) => ({
-        ...device,
-        id: String(index + 1),
-      }));
-      setAvailableDevices(devicesWithIds);
-      // Pre-select all devices by default
-      setSelectedDevices(devicesWithIds.map((d: any) => d.id));
-    }
+    const loadDevices = async () => {
+      try {
+        const result = await getUserDevices();
+        if (result.devices && result.devices.length > 0) {
+          setAvailableDevices(result.devices);
+          // Pre-select all devices by default
+          setSelectedDevices(result.devices.map((d: any) => d.id));
+        }
+      } catch (error) {
+        console.error("Failed to load devices:", error);
+      }
+    };
+    loadDevices();
   }, []);
 
   const toggleDevice = (id: string) => {
@@ -88,7 +96,7 @@ export default function AIAnalysis() {
           >
             <ArrowLeft className="w-5 h-5" strokeWidth={1.5} />
           </button>
-          
+
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -103,9 +111,9 @@ export default function AIAnalysis() {
 
         <div className="px-5 space-y-3">
           {availableDevices.map((device, index) => {
-            const Icon = iconMap[device.type as keyof typeof iconMap];
+            const Icon = iconMap[device.deviceType as keyof typeof iconMap] || iconMap[device.type as keyof typeof iconMap] || Zap;
             const isSelected = selectedDevices.includes(device.id);
-            
+
             return (
               <motion.button
                 key={device.id}
@@ -119,18 +127,19 @@ export default function AIAnalysis() {
                 <div className="w-14 h-14 bg-white/50 backdrop-blur-sm border border-white/60 rounded-2xl flex items-center justify-center flex-shrink-0">
                   <Icon className="w-6 h-6" strokeWidth={1.5} />
                 </div>
-                
+
                 <div className="flex-1 min-w-0">
-                  <h3 className="text-sm tracking-wide mb-1">{device.name}</h3>
-                  <p className="text-xs text-black/50">{device.power}W</p>
+                  <h3 className="text-sm tracking-wide mb-1">{device.customName || device.name}</h3>
+                  {(device.power || device.energyStarSpecs?.powerRatingW) > 0 && (
+                    <p className="text-xs text-black/50">{device.power || device.energyStarSpecs?.powerRatingW}W</p>
+                  )}
                 </div>
 
                 <div
-                  className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
-                    isSelected
-                      ? "border-black bg-black"
-                      : "border-black/20"
-                  }`}
+                  className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ${isSelected
+                    ? "border-black bg-black"
+                    : "border-black/20"
+                    }`}
                 >
                   {isSelected && <Check className="w-4 h-4 text-white" strokeWidth={2.5} />}
                 </div>
@@ -139,13 +148,13 @@ export default function AIAnalysis() {
           })}
         </div>
 
-        <div className="fixed bottom-20 left-0 right-0 px-5 pb-6 bg-gradient-to-t from-gray-100 via-gray-100 to-transparent pt-6">
+        <div className="fixed bottom-0 left-0 right-0 px-5 pb-6 bg-gradient-to-t from-gray-100 via-gray-100 to-transparent pt-6">
           <motion.button
             onClick={startAnalysis}
             disabled={selectedDevices.length === 0}
-            className="w-full py-3.5 bg-black text-white rounded-full text-sm tracking-wide hover:bg-black/90 transition-colors disabled:opacity-30 disabled:cursor-not-allowed shadow-lg"
+            className="w-full py-3.5 bg-black text-white rounded-full text-sm tracking-wide hover:bg-black/90 transition-colors disabled:cursor-not-allowed shadow-lg"
             initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
+            animate={{ opacity: selectedDevices.length === 0 ? 0.3 : 1, y: 0 }}
             transition={{ delay: 0.3 }}
             whileTap={{ scale: selectedDevices.length > 0 ? 0.98 : 1 }}
           >
@@ -205,7 +214,7 @@ export default function AIAnalysis() {
         <h2 className="text-2xl mb-3 tracking-tight">
           {stage === "complete" ? "Analysis Complete" : "Analyzing Your Devices..."}
         </h2>
-        
+
         <p className="text-sm text-black/60 mb-8">
           {stage === "complete"
             ? "We've found the best plans for you"
@@ -225,13 +234,12 @@ export default function AIAnalysis() {
               transition={{ delay: index * 0.1 }}
             >
               <div
-                className={`w-5 h-5 rounded-full border flex items-center justify-center flex-shrink-0 transition-colors ${
-                  index < currentStep
-                    ? "border-black bg-black"
-                    : index === currentStep
+                className={`w-5 h-5 rounded-full border flex items-center justify-center flex-shrink-0 transition-colors ${index < currentStep
+                  ? "border-black bg-black"
+                  : index === currentStep
                     ? "border-black"
                     : "border-black/20"
-                }`}
+                  }`}
               >
                 {index < currentStep && (
                   <Check className="w-3 h-3 text-white" strokeWidth={2.5} />
