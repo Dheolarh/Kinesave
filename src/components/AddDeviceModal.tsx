@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { X, Wind, Droplets, Flame, Fan, Search, Check, Zap, Tv } from "lucide-react";
+import { X, Wind, Droplets, Flame, Fan, Search, Check, Zap, Tv, PlusCircle } from "lucide-react";
 import { searchDevices, addDevice, submitSurvey, type EnergyStarDevice } from "../utils/api";
 
 interface AddDeviceModalProps {
@@ -13,13 +13,13 @@ const DEVICE_TYPES = [
   { value: "air_conditioner", label: "Air Conditioner", icon: Wind },
   { value: "refrigerator", label: "Refrigerator", icon: Droplets },
   { value: "tv", label: "TV", icon: Tv },
-  { value: "washing_machine", label: "Washing Machine", icon: Fan },
-  { value: "heater", label: "Heater", icon: Flame },
+  { value: "hot_plate", label: "Hot Plate", icon: Flame },
+  { value: "heater", label: "Heater", icon: Fan },
   { value: "led_bulb", label: "LED Bulb", icon: Zap },
 ];
 
 export default function AddDeviceModal({ isOpen, onClose, onAdd }: AddDeviceModalProps) {
-  const [stage, setStage] = useState<"form" | "results" | "adding" | "survey">("form");
+  const [stage, setStage] = useState<"form" | "results" | "manual" | "survey">("form");
   const [deviceType, setDeviceType] = useState("");
   const [brand, setBrand] = useState("");
   const [model, setModel] = useState("");
@@ -30,12 +30,19 @@ export default function AddDeviceModal({ isOpen, onClose, onAdd }: AddDeviceModa
   const [isAdding, setIsAdding] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Manual Entry State
+  const [manualDeviceName, setManualDeviceName] = useState("");
+  const [manualWattage, setManualWattage] = useState("");
+  const [manualBrand, setManualBrand] = useState("");
+  const [manualModel, setManualModel] = useState("");
+
   // Survey State
   const [frequency, setFrequency] = useState("");
   const [hoursPerDay, setHoursPerDay] = useState("");
   const [usageTimes, setUsageTimes] = useState<string[]>([]);
   const [room, setRoom] = useState("");
   const [customName, setCustomName] = useState("");
+  const [priority, setPriority] = useState(""); // NEW: Device priority
   const [isSubmittingSurvey, setIsSubmittingSurvey] = useState(false);
 
   const resetModal = () => {
@@ -54,6 +61,7 @@ export default function AddDeviceModal({ isOpen, onClose, onAdd }: AddDeviceModa
     setUsageTimes([]);
     setRoom("");
     setCustomName("");
+    setPriority("");
   };
 
   const handleSearch = async () => {
@@ -105,7 +113,7 @@ export default function AddDeviceModal({ isOpen, onClose, onAdd }: AddDeviceModa
   };
 
   const handleCompleteSurvey = async () => {
-    if (!selectedDevice || !frequency || !hoursPerDay || usageTimes.length === 0 || !customName.trim()) return;
+    if (!selectedDevice || !frequency || !hoursPerDay || usageTimes.length === 0 || !customName.trim() || !priority) return;
 
     setIsSubmittingSurvey(true);
     try {
@@ -117,6 +125,7 @@ export default function AddDeviceModal({ isOpen, onClose, onAdd }: AddDeviceModa
         deviceType: deviceType || selectedDevice.category,
         room: room || "Unassigned", // Use selected room or default
         customName: customName.trim(),
+        priority: priority, // NEW: Include priority
         energyStarSpecs: {
           annualEnergyUse: selectedDevice.annualEnergyUse,
           energyStarRating: selectedDevice.energyStarRating,
@@ -150,9 +159,8 @@ export default function AddDeviceModal({ isOpen, onClose, onAdd }: AddDeviceModa
 
   const frequencyOptions = [
     { value: "daily", label: "Daily" },
-    { value: "few_times_per_week", label: "Few times/week" },
-    { value: "rarely", label: "Rarely" },
-    { value: "seasonal", label: "Seasonal" },
+    { value: "frequently", label: "Frequently" },
+    { value: "weekends", label: "Weekends" },
   ];
 
   const timeOptions = [
@@ -201,7 +209,7 @@ export default function AddDeviceModal({ isOpen, onClose, onAdd }: AddDeviceModa
                   {stage === "form" ? "Add Device" :
                     stage === "results" ? "Select Device" :
                       stage === "survey" ? "Device Usage" :
-                        "Adding Devices"}
+                        "Add Devices"}
                 </h2>
                 <button
                   onClick={() => {
@@ -247,6 +255,15 @@ export default function AddDeviceModal({ isOpen, onClose, onAdd }: AddDeviceModa
                           </button>
                         );
                       })}
+
+                      {/* Others - Manual Entry */}
+                      <button
+                        onClick={() => setStage("manual")}
+                        className="flex items-center gap-2 px-4 py-3 rounded-xl border-2 shadow-lg hover:shadow-xl transition-all border-white/60 bg-white/40 hover:bg-white/50"
+                      >
+                        <PlusCircle className="w-5 h-5" strokeWidth={1.5} />
+                        <span className="text-sm">Others</span>
+                      </button>
                     </div>
                   </div>
 
@@ -300,6 +317,13 @@ export default function AddDeviceModal({ isOpen, onClose, onAdd }: AddDeviceModa
                         Search Device
                       </>
                     )}
+                  </button>
+
+                  <button
+                    onClick={() => setStage("manual")}
+                    className="w-full py-3.5 bg-white/60 backdrop-blur-xl border border-white/60 text-black rounded-full text-sm tracking-wide hover:bg-white/70 transition-colors mt-3"
+                  >
+                    Add Device Manually
                   </button>
                 </motion.div>
               )}
@@ -371,6 +395,119 @@ export default function AddDeviceModal({ isOpen, onClose, onAdd }: AddDeviceModa
                   >
                     {isAdding ? "Adding Device..." : "Select Device"}
                   </motion.button>
+                </div>
+              </>
+            )}
+
+            {/* Manual Entry Stage */}
+            {stage === "manual" && (
+              <>
+                <div className="px-6 flex-1 overflow-y-auto scrollbar-hide pb-6" style={{ minHeight: 0 }}>
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="space-y-6"
+                  >
+                    {/* Device Type Input */}
+                    <div>
+                      <label className="block text-xs text-black/60 mb-2 tracking-wide">
+                        Device Type
+                      </label>
+                      <input
+                        type="text"
+                        value={deviceType.replace("_", " ")}
+                        onChange={(e) => setDeviceType(e.target.value.toLowerCase().replace(" ", "_"))}
+                        placeholder="e.g., Air Conditioner"
+                        className="w-full px-4 py-3 bg-white/50 backdrop-blur-sm border border-white/60 rounded-xl text-sm shadow-lg focus:outline-none focus:border-black/30"
+                      />
+                    </div>
+
+                    {/* Device Name */}
+                    <div>
+                      <label className="block text-xs text-black/60 mb-2 tracking-wide">
+                        Device Name
+                      </label>
+                      <input
+                        type="text"
+                        value={manualDeviceName}
+                        onChange={(e) => setManualDeviceName(e.target.value)}
+                        placeholder="e.g., Living Room AC"
+                        className="w-full px-4 py-3 bg-white/50 backdrop-blur-sm border border-white/60 rounded-xl text-sm shadow-lg focus:outline-none focus:border-black/30"
+                      />
+                    </div>
+
+                    {/* Wattage */}
+                    <div>
+                      <label className="block text-xs text-black/60 mb-2 tracking-wide">
+                        Power Rating (Watts)
+                      </label>
+                      <input
+                        type="number"
+                        value={manualWattage}
+                        onChange={(e) => setManualWattage(e.target.value)}
+                        placeholder="e.g., 2000"
+                        min="0"
+                        className="w-full px-4 py-3 bg-white/50 backdrop-blur-sm border border-white/60 rounded-xl text-sm shadow-lg focus:outline-none focus:border-black/30"
+                      />
+                      <p className="text-xs text-black/40 pt-3">Check the device label or manual</p>
+                    </div>
+
+                    {/* Brand */}
+                    <div>
+                      <label className="block text-xs text-black/60 mb-2 tracking-wide">
+                        Brand (Optional)
+                      </label>
+                      <input
+                        type="text"
+                        value={manualBrand}
+                        onChange={(e) => setManualBrand(e.target.value)}
+                        placeholder="e.g., Samsung"
+                        className="w-full px-4 py-3 bg-white/50 backdrop-blur-sm border border-white/60 rounded-xl text-sm shadow-lg focus:outline-none focus:border-black/30"
+                      />
+                    </div>
+
+                    {/* Model */}
+                    <div>
+                      <label className="block text-xs text-black/60 mb-2 tracking-wide">
+                        Model Number (Optional)
+                      </label>
+                      <input
+                        type="text"
+                        value={manualModel}
+                        onChange={(e) => setManualModel(e.target.value)}
+                        placeholder="e.g., AR24TXHQABU"
+                        className="w-full px-4 py-3 bg-white/50 backdrop-blur-sm border border-white/60 rounded-xl text-sm shadow-lg focus:outline-none focus:border-black/30"
+                      />
+                    </div>
+                  </motion.div>
+                </div>
+
+                <div className="px-6 py-4 flex-shrink-0 flex gap-3">
+                  <button
+                    onClick={() => setStage("form")}
+                    className="flex-1 py-3.5 bg-white/60 backdrop-blur-xl border border-white/60 text-black rounded-full text-sm tracking-wide hover:bg-white/70 transition-colors"
+                  >
+                    Back
+                  </button>
+                  <button
+                    onClick={() => {
+                      // Create a manual device object
+                      setSelectedDevice({
+                        brand: manualBrand || "Unknown",
+                        modelNumber: manualModel || "Manual Entry",
+                        productName: manualDeviceName,
+                        category: deviceType,
+                        additionalSpecs: {
+                          powerRatingW: parseInt(manualWattage) || 0,
+                        },
+                      });
+                      setStage("survey");
+                    }}
+                    disabled={!manualDeviceName || !manualWattage}
+                    className="flex-1 bg-black text-white py-3.5 rounded-full text-sm tracking-wide hover:bg-black/90 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                  >
+                    Proceed
+                  </button>
                 </div>
               </>
             )}
@@ -485,6 +622,60 @@ export default function AddDeviceModal({ isOpen, onClose, onAdd }: AddDeviceModa
                         ))}
                       </div>
                     </div>
+
+                    {/* Device Priority - Slider (0-5) */}
+                    <div>
+                      <label className="block text-xs text-black/60 mb-2 tracking-wide">
+                        Priority
+                      </label>
+                      <div className="bg-white/40 backdrop-blur-xl border border-white/60 rounded-2xl p-4 shadow-lg">
+                        <input
+                          type="range"
+                          min="0"
+                          max="5"
+                          step="1"
+                          value={priority || 3}
+                          onChange={(e) => setPriority(e.target.value)}
+                          style={{
+                            accentColor: '#000000',
+                          }}
+                          className="w-full h-2 rounded-full appearance-none cursor-pointer
+                                     [&::-webkit-slider-runnable-track]:bg-black/10
+                                     [&::-webkit-slider-runnable-track]:rounded-full
+                                     [&::-webkit-slider-runnable-track]:h-2
+                                     [&::-webkit-slider-thumb]:appearance-none
+                                     [&::-webkit-slider-thumb]:w-5
+                                     [&::-webkit-slider-thumb]:h-5
+                                     [&::-webkit-slider-thumb]:rounded-full
+                                     [&::-webkit-slider-thumb]:bg-black
+                                     [&::-webkit-slider-thumb]:cursor-pointer
+                                     [&::-webkit-slider-thumb]:shadow-lg
+                                     [&::-webkit-slider-thumb]:-mt-1.5
+                                     [&::-moz-range-track]:bg-black/10
+                                     [&::-moz-range-track]:rounded-full
+                                     [&::-moz-range-track]:h-2
+                                     [&::-moz-range-track]:border-0
+                                     [&::-moz-range-thumb]:w-5
+                                     [&::-moz-range-thumb]:h-5
+                                     [&::-moz-range-thumb]:rounded-full
+                                     [&::-moz-range-thumb]:bg-black
+                                     [&::-moz-range-thumb]:cursor-pointer
+                                     [&::-moz-range-thumb]:border-0
+                                     [&::-moz-range-thumb]:shadow-lg"
+                        />
+                        <div className="flex justify-between mt-3 text-xs text-black/40">
+                          <span>0</span>
+                          <span>1</span>
+                          <span>2</span>
+                          <span>3</span>
+                          <span>4</span>
+                          <span>5</span>
+                        </div>
+                      </div>
+                      <p className="text-xs text-black/40 pt-3">
+                        How well you use this device
+                      </p>
+                    </div>
                   </motion.div>
                 </div>
 
@@ -505,22 +696,6 @@ export default function AddDeviceModal({ isOpen, onClose, onAdd }: AddDeviceModa
                   </motion.button>
                 </div>
               </>
-            )}
-
-            {/* Adding State */}
-            {stage === "adding" && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="flex flex-col items-center justify-center py-12"
-              >
-                <motion.div
-                  className="w-16 h-16 border-2 border-black/20 border-t-black rounded-full mb-4"
-                  animate={{ rotate: 360 }}
-                  transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                />
-                <p className="text-sm text-black/60">Adding device...</p>
-              </motion.div>
             )}
           </motion.div>
         </>

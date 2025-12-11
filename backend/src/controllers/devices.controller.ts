@@ -52,6 +52,7 @@ class DevicesController {
                 deviceType,
                 room,
                 customName,
+                priority, // NEW: Device priority
                 energyStarSpecs,
             } = req.body;
 

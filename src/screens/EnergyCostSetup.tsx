@@ -76,6 +76,7 @@ export default function EnergyCostSetup() {
   const navigate = useNavigate();
   const [monthlyCost, setMonthlyCost] = useState("");
   const [pricePerKwh, setPricePerKwh] = useState("");
+  const [powerHoursPerDay, setPowerHoursPerDay] = useState(8); // Default 8 hours
   const [showDeviceModal, setShowDeviceModal] = useState(false);
   const [selectedDevices, setSelectedDevices] = useState<any[]>([]);
   const [locationData, setLocationData] = useState<LocationData | null>(null);
@@ -151,26 +152,20 @@ export default function EnergyCostSetup() {
       currencySymbol: currency.symbol,
       location: locationDisplay,
     }));
-
-    // Always navigate to survey for the new device
-    // Use deviceId passed from modal, or fall back to device.id
-    // const targetId = deviceId || device.id;
-
-    // if (targetId) {
-    //   // Small delay to ensure state is saved
-    //   setTimeout(() => {
-    //     navigate("/usage-survey", { state: { device: { ...newDevice, id: targetId } } });
-    //   }, 100);
-    // } else {
-    //   console.error("No device ID available for navigation");
-    // }
   };
 
   const handleProceedToDashboard = () => {
+    // Calculate available kWh per month
+    const monthlyPurchase = parseFloat(monthlyCost);
+    const price = parseFloat(pricePerKwh);
+    const availableKwhPerMonth = monthlyPurchase / price;
+
     // Save energy cost data and devices to localStorage
     const energyData = {
       monthlyCost: parseFloat(monthlyCost),
       pricePerKwh: parseFloat(pricePerKwh),
+      powerHoursPerDay: powerHoursPerDay,
+      availableKwhPerMonth: availableKwhPerMonth,
       currency: currency.code,
       currencySymbol: currency.symbol,
       location: locationDisplay,
@@ -178,8 +173,8 @@ export default function EnergyCostSetup() {
     localStorage.setItem("energyData", JSON.stringify(energyData));
     localStorage.setItem("userDevices", JSON.stringify(selectedDevices));
 
-    // Navigate to dashboard
-    navigate("/dashboard");
+    // Navigate to about user page
+    navigate("/about-user");
   };
 
   const isFormValid = monthlyCost && pricePerKwh && selectedDevices.length > 0;
@@ -283,6 +278,35 @@ export default function EnergyCostSetup() {
           )}
         </motion.div>
 
+        {/* Power Availability Input */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.225 }}
+        >
+          <label className="block text-xs text-black/60 mb-3 tracking-wide px-1">
+            AVERAGE POWER HOURS PER DAY
+          </label>
+          <input
+            type="number"
+            min="0"
+            max="24"
+            step="1"
+            value={powerHoursPerDay}
+            onChange={(e) => setPowerHoursPerDay(parseInt(e.target.value) || 0)}
+            onBlur={() => {
+              if (powerHoursPerDay < 0) setPowerHoursPerDay(0);
+              if (powerHoursPerDay > 24) setPowerHoursPerDay(24);
+            }}
+            placeholder="8"
+            required
+            className="w-full px-4 py-4 bg-white/50 backdrop-blur-sm border border-white/60 rounded-2xl text-sm focus:outline-none focus:border-black/30 transition-colors shadow-lg"
+          />
+          <p className="text-xs text-black/40 mt-2 px-1" style={{ marginTop: "5px" }}>
+            How many hours per day do you have electricity?
+          </p>
+        </motion.div>
+
         {/* Devices Section */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
@@ -340,7 +364,7 @@ export default function EnergyCostSetup() {
             transition={{ delay: 0.35 }}
             whileTap={{ scale: !isFormValid ? 1 : 0.98 }}
           >
-            Proceed to Dashboard
+            Proceed
           </motion.button>
         )}
       </div>

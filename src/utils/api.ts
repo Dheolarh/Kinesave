@@ -61,22 +61,23 @@ export async function searchDevices(query: {
 /**
  * Add device to user's home
  */
-export async function addDevice(device: {
+export const addDevice = async (data: {
   brand: string;
   modelNumber: string;
   productName: string;
   deviceType: string;
   room: string;
   customName?: string;
+  priority?: string; // NEW: Device priority
   energyStarSpecs: any;
-}): Promise<any> {
+}): Promise<{ device: any }> => {
   try {
     const response = await fetch(`${API_BASE_URL}/devices`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(device),
+      body: JSON.stringify(data),
     });
 
     if (!response.ok) {
@@ -172,6 +173,35 @@ export async function submitSurvey(deviceId: string, answers: {
     return await response.json();
   } catch (error) {
     console.error('Error submitting survey:', error);
+    throw error;
+  }
+}
+
+/**
+ * Save complete user data to backend
+ */
+export async function saveCompleteUserData(data: {
+  location: any;
+  energyCosts: any;
+  devices: any[];
+  aboutUser: any;
+}): Promise<any> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/userdata/save`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to save user data');
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error saving user data:', error);
     throw error;
   }
 }

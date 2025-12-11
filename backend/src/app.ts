@@ -2,6 +2,7 @@ import express, { Express, Request, Response } from 'express';
 import cors from 'cors';
 import devicesRouter from './routes/devices.routes';
 import surveyRouter from './routes/survey.routes';
+import userdataRouter from './routes/userdata.routes';
 
 const app: Express = express();
 const PORT = process.env.PORT || 3001;
@@ -18,6 +19,7 @@ app.get('/health', (req: Request, res: Response) => {
 // Routes
 app.use('/api/devices', devicesRouter);
 app.use('/api/devices', surveyRouter); // Survey routes under /api/devices/:id/survey
+app.use('/api/userdata', userdataRouter); // User data storage
 
 // Start server
 app.listen(PORT, () => {
