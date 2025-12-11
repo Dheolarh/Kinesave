@@ -424,7 +424,7 @@ export default function AddDeviceModal({ isOpen, onClose, onAdd }: AddDeviceModa
                       <input
                         type="text"
                         value={deviceType.replace("_", " ")}
-                        onChange={(e) => setDeviceType(e.target.value.toLowerCase().replace(" ", "_"))}
+                        onChange={(e) => setDeviceType(e.target.value.replace(" ", "_"))}
                         placeholder="e.g., Air Conditioner"
                         className="w-full px-4 py-3 bg-white/50 backdrop-blur-sm border border-white/60 rounded-xl text-sm shadow-lg focus:outline-none focus:border-black/30"
                       />
