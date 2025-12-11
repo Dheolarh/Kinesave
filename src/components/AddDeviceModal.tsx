@@ -29,6 +29,7 @@ export default function AddDeviceModal({ isOpen, onClose, onAdd }: AddDeviceModa
   const [isSearching, setIsSearching] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [previousStage, setPreviousStage] = useState<"results" | "manual" | null>(null);
 
   // Manual Entry State
   const [manualDeviceName, setManualDeviceName] = useState("");
@@ -100,7 +101,8 @@ export default function AddDeviceModal({ isOpen, onClose, onAdd }: AddDeviceModa
 
   const handleAddDevice = async () => {
     if (!selectedDevice) return;
-    // Just move to survey stage, defer API call
+    // Track that we came from results, then move to survey
+    setPreviousStage("results");
     setStage("survey");
   };
 
@@ -178,7 +180,7 @@ export default function AddDeviceModal({ isOpen, onClose, onAdd }: AddDeviceModa
     { value: "other", label: "Other" },
   ];
 
-  const isSurveyValid = frequency && hoursPerDay && usageTimes.length > 0 && customName.trim();
+  const isSurveyValid = frequency && hoursPerDay && usageTimes.length > 0 && customName.trim() && priority;
 
   return (
     <AnimatePresence>
@@ -377,6 +379,12 @@ export default function AddDeviceModal({ isOpen, onClose, onAdd }: AddDeviceModa
                         </motion.button>
                       );
                     })}
+
+                    {/* Hint text */}
+                    <p className="text-xs text-black/50 text-center mt-6">
+                      Couldn't find your device?<br />
+                      Try adding manually
+                    </p>
                   </div>
                 </div>
 
@@ -418,20 +426,6 @@ export default function AddDeviceModal({ isOpen, onClose, onAdd }: AddDeviceModa
                         value={deviceType.replace("_", " ")}
                         onChange={(e) => setDeviceType(e.target.value.toLowerCase().replace(" ", "_"))}
                         placeholder="e.g., Air Conditioner"
-                        className="w-full px-4 py-3 bg-white/50 backdrop-blur-sm border border-white/60 rounded-xl text-sm shadow-lg focus:outline-none focus:border-black/30"
-                      />
-                    </div>
-
-                    {/* Device Name */}
-                    <div>
-                      <label className="block text-xs text-black/60 mb-2 tracking-wide">
-                        Device Name
-                      </label>
-                      <input
-                        type="text"
-                        value={manualDeviceName}
-                        onChange={(e) => setManualDeviceName(e.target.value)}
-                        placeholder="e.g., Living Room AC"
                         className="w-full px-4 py-3 bg-white/50 backdrop-blur-sm border border-white/60 rounded-xl text-sm shadow-lg focus:outline-none focus:border-black/30"
                       />
                     </div>
@@ -495,15 +489,17 @@ export default function AddDeviceModal({ isOpen, onClose, onAdd }: AddDeviceModa
                       setSelectedDevice({
                         brand: manualBrand || "Unknown",
                         modelNumber: manualModel || "Manual Entry",
-                        productName: manualDeviceName,
+                        productName: deviceType.replace("_", " "), // Use device type as product name
                         category: deviceType,
                         additionalSpecs: {
                           powerRatingW: parseInt(manualWattage) || 0,
                         },
                       });
+                      // Track that we came from manual entry
+                      setPreviousStage("manual");
                       setStage("survey");
                     }}
-                    disabled={!manualDeviceName || !manualWattage}
+                    disabled={!manualWattage}
                     className="flex-1 bg-black text-white py-3.5 rounded-full text-sm tracking-wide hover:bg-black/90 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                   >
                     Proceed
@@ -681,7 +677,7 @@ export default function AddDeviceModal({ isOpen, onClose, onAdd }: AddDeviceModa
 
                 <div className="px-6 py-4 flex-shrink-0 flex gap-3">
                   <button
-                    onClick={() => setStage("results")}
+                    onClick={() => setStage(previousStage || "results")}
                     className="flex-1 py-3.5 bg-white/60 backdrop-blur-xl border border-white/60 text-black rounded-full text-sm tracking-wide hover:bg-white/70 transition-colors"
                   >
                     Back
