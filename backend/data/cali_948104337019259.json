@@ -1,0 +1,45 @@
+{
+  "userName": "Cali",
+  "userId": "cali_948104337019259",
+  "location": {
+    "city": "Oshodi",
+    "region": "Lagos State",
+    "country": "Nigeria",
+    "latitude": 0,
+    "longitude": 0,
+    "temperature": 29,
+    "weatherDescription": "Partly cloudy"
+  },
+  "energyCosts": {
+    "monthlyCost": 3000,
+    "pricePerKwh": 36,
+    "powerHoursPerDay": 8,
+    "availableKwhPerMonth": 83.33333333333333,
+    "currency": "NGN",
+    "currencySymbol": "₦"
+  },
+  "devices": [
+    {
+      "id": "dev_1765529026622",
+      "customName": "Room TV",
+      "originalName": "Samsung 65\" OLED 4K TV",
+      "deviceType": "tv",
+      "brand": "Samsung",
+      "modelNumber": "QN65S90C",
+      "wattage": 0,
+      "priority": "3",
+      "survey": {
+        "frequency": "daily",
+        "hoursPerDay": 0,
+        "usageTimes": [],
+        "room": "bedroom"
+      }
+    }
+  ],
+  "aboutUser": {
+    "householdSize": 1,
+    "occupationType": "employed",
+    "homeType": "apartment"
+  },
+  "savedAt": "2025-12-12T08:43:58.033Z"
+}

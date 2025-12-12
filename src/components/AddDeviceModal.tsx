@@ -120,6 +120,7 @@ export default function AddDeviceModal({ isOpen, onClose, onAdd }: AddDeviceModa
     setIsSubmittingSurvey(true);
     try {
       // 1. Add Device
+      const userName = localStorage.getItem("userName") || "user";
       const addResponse = await addDevice({
         brand: selectedDevice.brand,
         modelNumber: selectedDevice.modelNumber,
@@ -128,6 +129,7 @@ export default function AddDeviceModal({ isOpen, onClose, onAdd }: AddDeviceModa
         room: room || "Unassigned", // Use selected room or default
         customName: customName.trim(),
         priority: priority, // NEW: Include priority
+        userName, // Include userName for file identification
         energyStarSpecs: {
           annualEnergyUse: selectedDevice.annualEnergyUse,
           energyStarRating: selectedDevice.energyStarRating,
@@ -205,7 +207,7 @@ export default function AddDeviceModal({ isOpen, onClose, onAdd }: AddDeviceModa
             transition={{ type: "spring", damping: 30, stiffness: 300 }}
           >
             {/* Header - Fixed */}
-            <div className="px-6 pt-6 pb-4 flex-shrink-0">
+            <div className="px-6 pt-6 pb-4 mb-2 flex-shrink-0">
               <div className="flex items-center justify-between">
                 <h2 className="text-xl tracking-tight">
                   {stage === "form" ? "Add Device" :
@@ -558,17 +560,19 @@ export default function AddDeviceModal({ isOpen, onClose, onAdd }: AddDeviceModa
                         Hours per day (0-24)
                       </label>
                       <input
-                        type="number"
+                        type="text"
+                        inputMode="decimal"
                         value={hoursPerDay}
-                        onChange={(e) => setHoursPerDay(e.target.value)}
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/[^0-9.]/g, '');
+                          setHoursPerDay(value);
+                        }}
                         onBlur={() => {
                           const val = parseFloat(hoursPerDay);
                           if (val < 0) setHoursPerDay("0");
                           if (val > 24) setHoursPerDay("24");
                         }}
                         placeholder="e.g., 8(hours), 0.2(20 minutes)"
-                        min="0"
-                        max="24"
                         className="w-full px-4 py-3 bg-white/50 backdrop-blur-sm border border-white/60 rounded-xl text-sm shadow-lg focus:outline-none focus:border-black/30"
                       />
                     </div>
@@ -630,7 +634,7 @@ export default function AddDeviceModal({ isOpen, onClose, onAdd }: AddDeviceModa
                           min="0"
                           max="5"
                           step="1"
-                          value={priority || 3}
+                          value={priority || 0}
                           onChange={(e) => setPriority(e.target.value)}
                           style={{
                             accentColor: '#000000',

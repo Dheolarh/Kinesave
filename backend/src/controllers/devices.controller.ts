@@ -1,9 +1,64 @@
 import { Request, Response } from 'express';
 import deviceSpecsService from '../services/energy-star.service';
+import * as fs from 'fs';
+import * as path from 'path';
 
 class DevicesController {
     // In-memory storage for devices (temporary)
     private devices: any[] = [];
+    private dataDir = path.join(__dirname, '../../data');
+    private currentUserName: string = 'user'; // Default username
+
+    /**
+     * Get user file path based on username
+     */
+    private getUserFilePath(userName?: string): string {
+        const filename = userName
+            ? `${userName.toLowerCase().replace(/\s+/g, '_')}.json`
+            : 'userdata.json';
+        return path.join(this.dataDir, filename);
+    }
+
+    /**
+     * Helper: Add device to user's JSON file
+     */
+    private addDeviceToUserFile(device: any) {
+        try {
+            const userFile = this.getUserFilePath(this.currentUserName);
+            if (fs.existsSync(userFile)) {
+                const data = JSON.parse(fs.readFileSync(userFile, 'utf-8'));
+
+                // Initialize devices array if it doesn't exist
+                if (!data.devices) {
+                    data.devices = [];
+                }
+
+                // Add new device to the array with ID
+                const deviceData = {
+                    id: device.id, // Store the device ID
+                    customName: device.customName,
+                    originalName: device.productName,
+                    deviceType: device.deviceType,
+                    brand: device.brand || "Unknown",
+                    modelNumber: device.modelNumber || "N/A",
+                    wattage: device.energyStarSpecs?.powerRatingW || device.power || 0,
+                    priority: device.priority || 0,
+                    survey: device.survey || {
+                        frequency: "daily",
+                        hoursPerDay: 0,
+                        usageTimes: [],
+                        room: device.room || "Unassigned"
+                    }
+                };
+
+                data.devices.push(deviceData);
+                fs.writeFileSync(userFile, JSON.stringify(data, null, 2), 'utf-8');
+            }
+        } catch (error) {
+            console.error('Error adding device to user file:', error);
+        }
+    }
+
 
     /**
      * Search Energy Star database for devices
@@ -52,27 +107,35 @@ class DevicesController {
                 deviceType,
                 room,
                 customName,
-                priority, // NEW: Device priority
+                priority,
                 energyStarSpecs,
+                userName,
             } = req.body;
 
-            // Save to in-memory storage
+            // Update current user name for file operations
+            if (userName) {
+                this.currentUserName = userName;
+            }
+
+            // Create device object
             const device = {
                 id: `dev_${Date.now()}`,
-                userId: 'user123', // TODO: Get from auth middleware when implemented
+                userId: 'user123',
                 brand,
                 modelNumber,
                 productName,
                 deviceType,
                 room,
                 customName: customName || productName,
+                priority,
                 energyStarSpecs,
                 createdAt: new Date().toISOString(),
-                status: 'active', // Default status
-                power: energyStarSpecs?.powerRatingW || 0, // Extract power for dashboard
+                status: 'active',
+                power: energyStarSpecs?.powerRatingW || 0,
             };
 
-            this.devices.push(device);
+            // Add device directly to user's JSON file
+            this.addDeviceToUserFile(device);
 
             return res.status(201).json({
                 message: 'Device added successfully',
@@ -89,15 +152,52 @@ class DevicesController {
 
     /**
      * Get user's devices
-     * GET /api/devices
+     * GET /api/devices?userName=<username>
      */
     async getDevices(req: Request, res: Response) {
         try {
-            const userId = 'user123'; // TODO: Get from auth middleware when implemented
+            const { userName } = req.query;
 
+            // Update current user name for file operations
+            if (userName && typeof userName === 'string') {
+                this.currentUserName = userName;
+            }
+
+            // Load devices from user's JSON file instead of in-memory array
+            const userFile = this.getUserFilePath(this.currentUserName);
+
+            if (fs.existsSync(userFile)) {
+                const data = JSON.parse(fs.readFileSync(userFile, 'utf-8'));
+
+                // Map devices to include necessary fields for frontend
+                const devices = (data.devices || []).map((device: any) => ({
+                    id: device.id, // Use ID from JSON
+                    customName: device.customName,
+                    name: device.originalName,
+                    productName: device.originalName,
+                    deviceType: device.deviceType,
+                    brand: device.brand,
+                    modelNumber: device.modelNumber,
+                    power: device.wattage,
+                    priority: device.priority,
+                    status: 'active',
+                    additionalSpecs: {
+                        powerRatingW: device.wattage,
+                    },
+                    survey: device.survey,
+                    room: device.survey?.room || 'Unassigned',
+                }));
+
+                return res.json({
+                    devices,
+                    count: devices.length,
+                });
+            }
+
+            // If file doesn't exist, return empty array
             return res.json({
-                devices: this.devices,
-                count: this.devices.length,
+                devices: [],
+                count: 0,
             });
         } catch (error: any) {
             console.error('Get devices error:', error);
@@ -147,17 +247,46 @@ class DevicesController {
 
     /**
      * Delete device
-     * DELETE /api/devices/:id
+     * DELETE /api/devices/:id?userName=<username>
      */
     async deleteDevice(req: Request, res: Response) {
         try {
             const { id } = req.params;
+            const { userName } = req.query;
 
-            // TODO: Delete from database
+            // Update current user name for file operations
+            if (userName && typeof userName === 'string') {
+                this.currentUserName = userName;
+            }
 
-            return res.json({
-                message: 'Device deleted successfully',
-                deviceId: id,
+            // Load devices from user's JSON file
+            const userFile = this.getUserFilePath(this.currentUserName);
+
+            if (fs.existsSync(userFile)) {
+                const data = JSON.parse(fs.readFileSync(userFile, 'utf-8'));
+
+                // Filter out the device to delete by ID
+                const originalCount = (data.devices || []).length;
+                data.devices = (data.devices || []).filter((device: any) => device.id !== id);
+
+                // Check if a device was actually deleted
+                if (data.devices.length === originalCount) {
+                    return res.status(404).json({
+                        error: 'Device not found',
+                    });
+                }
+
+                // Save back to file
+                fs.writeFileSync(userFile, JSON.stringify(data, null, 2), 'utf-8');
+
+                return res.json({
+                    message: 'Device deleted successfully',
+                    deviceId: id,
+                });
+            }
+
+            return res.status(404).json({
+                error: 'User file not found',
             });
         } catch (error: any) {
             console.error('Delete device error:', error);

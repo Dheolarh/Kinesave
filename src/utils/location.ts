@@ -39,8 +39,8 @@ export function isMedianApp(): boolean {
 export function getCurrentPosition(): Promise<GeolocationPosition> {
     return new Promise((resolve, reject) => {
         const options: PositionOptions = {
-            enableHighAccuracy: true,
-            timeout: 10000,
+            enableHighAccuracy: false, // Changed to false for faster response
+            timeout: 30000, // Increased from 10000ms to 30000ms (30 seconds)
             maximumAge: 0,
         };
 

@@ -76,7 +76,8 @@ export default function EnergyCostSetup() {
   const navigate = useNavigate();
   const [monthlyCost, setMonthlyCost] = useState("");
   const [pricePerKwh, setPricePerKwh] = useState("");
-  const [powerHoursPerDay, setPowerHoursPerDay] = useState(8); // Default 8 hours
+  const [preferredBudget, setPreferredBudget] = useState("");
+  const [powerHoursPerDay, setPowerHoursPerDay] = useState(24); // Default 8 hours
   const [showDeviceModal, setShowDeviceModal] = useState(false);
   const [selectedDevices, setSelectedDevices] = useState<any[]>([]);
   const [locationData, setLocationData] = useState<LocationData | null>(null);
@@ -107,9 +108,10 @@ export default function EnergyCostSetup() {
     const savedDevices = localStorage.getItem("userDevices");
 
     if (savedEnergyData) {
-      const { monthlyCost, pricePerKwh } = JSON.parse(savedEnergyData);
+      const { monthlyCost, pricePerKwh, preferredBudget } = JSON.parse(savedEnergyData);
       setMonthlyCost(monthlyCost || "");
       setPricePerKwh(pricePerKwh || "");
+      setPreferredBudget(preferredBudget || "");
     }
 
     if (savedDevices) {
@@ -148,6 +150,7 @@ export default function EnergyCostSetup() {
     localStorage.setItem("energyData", JSON.stringify({
       monthlyCost,
       pricePerKwh,
+      preferredBudget,
       currency: currency.code,
       currencySymbol: currency.symbol,
       location: locationDisplay,
@@ -164,6 +167,7 @@ export default function EnergyCostSetup() {
     const energyData = {
       monthlyCost: parseFloat(monthlyCost),
       pricePerKwh: parseFloat(pricePerKwh),
+      preferredBudget: preferredBudget ? parseFloat(preferredBudget) : null,
       powerHoursPerDay: powerHoursPerDay,
       availableKwhPerMonth: availableKwhPerMonth,
       currency: currency.code,
@@ -225,14 +229,18 @@ export default function EnergyCostSetup() {
               {currency.symbol}
             </div>
             <input
-              type="number"
-              min="0"
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
               value={monthlyCost}
-              onChange={(e) => setMonthlyCost(e.target.value)}
-              onBlur={() => {
-                if (parseFloat(monthlyCost) < 0) setMonthlyCost("0");
+              onChange={(e) => {
+                const value = e.target.value.replace(/[^0-9.]/g, '');
+                setMonthlyCost(value);
               }}
-              placeholder="150.00"
+              onBlur={() => {
+                if (monthlyCost && parseFloat(monthlyCost) < 0) setMonthlyCost("0");
+              }}
+              placeholder=""
               required
               className="w-full pl-10 pr-4 py-4 bg-white/50 backdrop-blur-sm border border-white/60 rounded-2xl text-sm focus:outline-none focus:border-black/30 transition-colors shadow-lg"
             />
@@ -242,6 +250,38 @@ export default function EnergyCostSetup() {
           ) : (
             <p className="text-xs text-black/40 mt-2 px-1" style={{ marginTop: "5px" }}>Check your recent electricity bill</p>
           )}
+        </motion.div>
+
+        {/* Preferred Monthly Budget Input */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.175 }}
+        >
+          <label className="block text-xs text-black/60 mb-3 tracking-wide px-1">
+            PREFERRED MONTHLY BUDGET ({currency.symbol})
+          </label>
+          <div className="relative">
+            <div className="absolute left-5 top-1/2 -translate-y-1/2 text-black/40">
+              {currency.symbol}
+            </div>
+            <input
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              value={preferredBudget}
+              onChange={(e) => {
+                const value = e.target.value.replace(/[^0-9.]/g, '');
+                setPreferredBudget(value);
+              }}
+              onBlur={() => {
+                if (preferredBudget && parseFloat(preferredBudget) < 0) setPreferredBudget("0");
+              }}
+              placeholder=""
+              className="w-full pl-10 pr-4 py-4 bg-white/50 backdrop-blur-sm border border-white/60 rounded-2xl text-sm focus:outline-none focus:border-black/30 transition-colors shadow-lg"
+            />
+          </div>
+          <p className="text-xs text-black/40 mt-2 px-1" style={{ marginTop: "5px" }}>Maximum you want to spend monthly on electricity</p>
         </motion.div>
 
         {/* Price per kWh Input */}
@@ -258,15 +298,18 @@ export default function EnergyCostSetup() {
               {currency.symbol}
             </div>
             <input
-              type="number"
-              step="0.01"
-              min="0"
+              type="text"
+              inputMode="decimal"
+              pattern="[0-9.]*"
               value={pricePerKwh}
-              onChange={(e) => setPricePerKwh(e.target.value)}
-              onBlur={() => {
-                if (parseFloat(pricePerKwh) < 0) setPricePerKwh("0");
+              onChange={(e) => {
+                const value = e.target.value.replace(/[^0-9.]/g, '');
+                setPricePerKwh(value);
               }}
-              placeholder="0.15"
+              onBlur={() => {
+                if (pricePerKwh && parseFloat(pricePerKwh) < 0) setPricePerKwh("0");
+              }}
+              placeholder=""
               required
               className="w-full pl-10 pr-4 py-4 bg-white/50 backdrop-blur-sm border border-white/60 rounded-2xl text-sm focus:outline-none focus:border-black/30 transition-colors shadow-lg"
             />
@@ -298,7 +341,7 @@ export default function EnergyCostSetup() {
               if (powerHoursPerDay < 0) setPowerHoursPerDay(0);
               if (powerHoursPerDay > 24) setPowerHoursPerDay(24);
             }}
-            placeholder="8"
+            placeholder=""
             required
             className="w-full px-4 py-4 bg-white/50 backdrop-blur-sm border border-white/60 rounded-2xl text-sm focus:outline-none focus:border-black/30 transition-colors shadow-lg"
           />

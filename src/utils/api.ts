@@ -69,6 +69,7 @@ export const addDevice = async (data: {
   room: string;
   customName?: string;
   priority?: string; // NEW: Device priority
+  userName?: string; // NEW: User name for file identification
   energyStarSpecs: any;
 }): Promise<{ device: any }> => {
   try {
@@ -121,7 +122,10 @@ export async function updateDevice(deviceId: string, updates: any): Promise<any>
  */
 export async function getUserDevices(): Promise<any> {
   try {
-    const response = await fetch(`${API_BASE_URL}/devices`);
+    const userName = localStorage.getItem("userName") || "user";
+    const response = await fetch(
+      `${API_BASE_URL}/devices?userName=${encodeURIComponent(userName)}`
+    );
     if (!response.ok) {
       throw new Error('Failed to fetch devices');
     }

@@ -175,6 +175,7 @@ export default function LocationDetection() {
                 <p className="text-sm mb-2 text-black/70 font-medium">
                   {locationData.city}
                   {locationData.region && `, ${locationData.region}`}
+                  {locationData.country && `, ${locationData.country}`}
                 </p>
                 <p className="text-xs mb-6 text-black/50">
                   {locationData.temperature}°C • {locationData.humidity}% humidity

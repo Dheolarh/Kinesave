@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router";
 import { motion } from "motion/react";
 import { ArrowLeft } from "lucide-react";
-import { getUserDevices, saveCompleteUserData } from "../utils/api";
+import { saveCompleteUserData } from "../utils/api";
 import { getLocationFromStorage } from "../utils/location";
 
 export default function AboutUser() {
@@ -17,12 +17,18 @@ export default function AboutUser() {
 
         try {
             // Gather all data from different sources
+            const userName = localStorage.getItem("userName") || "user";
+            const userId = localStorage.getItem("userId") || "";
             const location = getLocationFromStorage();
             const energyData = JSON.parse(localStorage.getItem("energyData") || "{}");
-            const devices = await getUserDevices();
+
+            // Load devices from localStorage (where setup saved them)
+            const devicesList = JSON.parse(localStorage.getItem("userDevices") || "[]");
 
             // Create consolidated user data structure
             const completeUserData = {
+                userName,
+                userId,    // Include userId for database migration
                 location: {
                     city: location?.city || "",
                     region: location?.region || "",
@@ -40,22 +46,21 @@ export default function AboutUser() {
                     currency: energyData.currency || "NGN",
                     currencySymbol: energyData.currencySymbol || "₦",
                 },
-                devices: devices.devices.map((device: any) => ({
-                    customName: device.customName,
+                devices: devicesList.map((device: any) => ({
+                    id: device.id || `dev_${Date.now()}_${Math.random()}`, // Ensure ID exists
+                    customName: device.customName || device.productName,
                     originalName: device.productName,
                     deviceType: device.deviceType,
-                    brand: device.brand,
-                    modelNumber: device.modelNumber,
+                    brand: device.brand || "Unknown",
+                    modelNumber: device.modelNumber || "N/A",
                     wattage: device.energyStarSpecs?.powerRatingW || device.power || 0,
-                    priority: device.priority || "important",
-                    survey: {
-                        frequency: device.survey?.frequency || "daily",
-                        hoursPerDay: device.survey?.hoursPerDay || 0,
-                        usageTimes: device.survey?.usageTimes || [],
+                    priority: device.priority || 0,
+                    survey: device.survey || {
+                        frequency: "daily",
+                        hoursPerDay: 0,
+                        usageTimes: [],
                         room: device.room || "Unassigned",
                     },
-                    energyStarRating: device.energyStarSpecs?.energyStarRating || "",
-                    annualEnergyUse: device.energyStarSpecs?.annualEnergyUse || 0,
                 })),
                 aboutUser: {
                     householdSize: parseInt(householdSize),
@@ -68,12 +73,11 @@ export default function AboutUser() {
             // Save to backend
             await saveCompleteUserData(completeUserData);
 
-            // Also save to localStorage as backup
-            localStorage.setItem("userData", JSON.stringify({
-                householdSize: parseInt(householdSize),
-                occupationType,
-                homeType,
-            }));
+            // Clear temporary localStorage data (keep userName only)
+            localStorage.removeItem("energyData");
+            localStorage.removeItem("locationData");
+            localStorage.removeItem("userData");
+            localStorage.removeItem("userDevices");
 
             // Navigate to dashboard
             navigate("/dashboard");
