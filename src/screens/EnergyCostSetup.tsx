@@ -3,73 +3,26 @@ import { useNavigate } from "react-router";
 import { motion, AnimatePresence, useMotionValue, useTransform } from "motion/react";
 import { Trash2 } from "lucide-react";
 import AddDeviceModal from "../components/AddDeviceModal";
+import { updateUserProfile } from "../utils/storage";
 import { getLocationFromStorage, type LocationData } from "../utils/location";
+import getSymbolFromCurrency from "currency-symbol-map";
+// @ts-ignore - Library doesn't have TypeScript types
+import { getCountry } from "country-currency-map";
 
-// Currency mapping based on country
-const getCurrencyForCountry = (country: string): { symbol: string; code: string } => {
-  const currencyMap: { [key: string]: { symbol: string; code: string } } = {
-    // Africa
-    "Nigeria": { symbol: "₦", code: "NGN" },
-    "South Africa": { symbol: "R", code: "ZAR" },
-    "Kenya": { symbol: "KSh", code: "KES" },
-    "Ghana": { symbol: "₵", code: "GHS" },
-    "Egypt": { symbol: "E£", code: "EGP" },
-    "Morocco": { symbol: "MAD", code: "MAD" },
-    "Ethiopia": { symbol: "Br", code: "ETB" },
-    "Tanzania": { symbol: "TSh", code: "TZS" },
-    "Uganda": { symbol: "USh", code: "UGX" },
-
-    // Americas
-    "United States": { symbol: "$", code: "USD" },
-    "Canada": { symbol: "$", code: "CAD" },
-    "Mexico": { symbol: "$", code: "MXN" },
-    "Brazil": { symbol: "R$", code: "BRL" },
-    "Argentina": { symbol: "$", code: "ARS" },
-    "Chile": { symbol: "$", code: "CLP" },
-    "Colombia": { symbol: "$", code: "COP" },
-
-    // Europe
-    "United Kingdom": { symbol: "£", code: "GBP" },
-    "Germany": { symbol: "€", code: "EUR" },
-    "France": { symbol: "€", code: "EUR" },
-    "Spain": { symbol: "€", code: "EUR" },
-    "Italy": { symbol: "€", code: "EUR" },
-    "Netherlands": { symbol: "€", code: "EUR" },
-    "Belgium": { symbol: "€", code: "EUR" },
-    "Portugal": { symbol: "€", code: "EUR" },
-    "Greece": { symbol: "€", code: "EUR" },
-    "Ireland": { symbol: "€", code: "EUR" },
-    "Austria": { symbol: "€", code: "EUR" },
-    "Switzerland": { symbol: "CHF", code: "CHF" },
-    "Sweden": { symbol: "kr", code: "SEK" },
-    "Norway": { symbol: "kr", code: "NOK" },
-    "Denmark": { symbol: "kr", code: "DKK" },
-    "Poland": { symbol: "zł", code: "PLN" },
-    "Russia": { symbol: "₽", code: "RUB" },
-
-    // Asia
-    "India": { symbol: "₹", code: "INR" },
-    "China": { symbol: "¥", code: "CNY" },
-    "Japan": { symbol: "¥", code: "JPY" },
-    "South Korea": { symbol: "₩", code: "KRW" },
-    "Indonesia": { symbol: "Rp", code: "IDR" },
-    "Thailand": { symbol: "฿", code: "THB" },
-    "Vietnam": { symbol: "₫", code: "VND" },
-    "Philippines": { symbol: "₱", code: "PHP" },
-    "Malaysia": { symbol: "RM", code: "MYR" },
-    "Singapore": { symbol: "$", code: "SGD" },
-    "Pakistan": { symbol: "₨", code: "PKR" },
-    "Bangladesh": { symbol: "৳", code: "BDT" },
-    "Saudi Arabia": { symbol: "﷼", code: "SAR" },
-    "United Arab Emirates": { symbol: "د.إ", code: "AED" },
-    "Turkey": { symbol: "₺", code: "TRY" },
-
-    // Oceania
-    "Australia": { symbol: "$", code: "AUD" },
-    "New Zealand": { symbol: "$", code: "NZD" },
-  };
-
-  return currencyMap[country] || { symbol: "$", code: "USD" }; // Default to USD
+// Get currency info for any country (automatic mapping!)
+const getCurrencyForCountry = (countryName: string): { symbol: string; code: string } => {
+  try {
+    const countryData = getCountry(countryName);
+    if (countryData && countryData.currency) {
+      const code = countryData.currency;
+      const symbol = getSymbolFromCurrency(code) || "$";
+      return { symbol, code };
+    }
+  } catch (error) {
+    console.log(`Currency mapping not found for ${countryName}, using USD`);
+  }
+  // Default to USD if not found
+  return { symbol: "$", code: "USD" };
 };
 
 export default function EnergyCostSetup() {
@@ -157,7 +110,7 @@ export default function EnergyCostSetup() {
     }));
   };
 
-  const handleProceed = async () => {
+  const handleProceed = () => {
     // Calculate
     const monthlyPurchase = parseFloat(monthlyCost);
     const price = parseFloat(pricePerKwh);
@@ -193,9 +146,8 @@ export default function EnergyCostSetup() {
     }));
 
     try {
-      // Save to backend JSON
-      const { updateUserProfile } = await import("../utils/dataBrain");
-      await updateUserProfile({
+      // Save to localStorage
+      updateUserProfile({
         energyCosts: energyData,
         devices: devicesData,
       });

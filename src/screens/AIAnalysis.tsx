@@ -3,7 +3,7 @@ import { useNavigate } from "react-router";
 import { motion, AnimatePresence } from "motion/react";
 import { Check, Wind, Droplets, Flame, Fan, ArrowLeft, Tv, Zap } from "lucide-react";
 import Orb from "../components/Orb";
-import { getUserDevices } from "../utils/api";
+import { getCurrentUserProfile } from "../utils/storage";
 
 const iconMap = {
   ac: Wind,
@@ -31,15 +31,15 @@ export default function AIAnalysis() {
   const [selectedDevices, setSelectedDevices] = useState<string[]>([]);
   const [currentStep, setCurrentStep] = useState(0);
 
-  // Load user devices from backend API
+  // Load user devices from localStorage
   useEffect(() => {
-    const loadDevices = async () => {
+    const loadDevices = () => {
       try {
-        const result = await getUserDevices();
-        if (result.devices && result.devices.length > 0) {
-          setAvailableDevices(result.devices);
+        const profile = getCurrentUserProfile();
+        if (profile?.devices && profile.devices.length > 0) {
+          setAvailableDevices(profile.devices);
           // Pre-select all devices by default
-          setSelectedDevices(result.devices.map((d: any) => d.id));
+          setSelectedDevices(profile.devices.map((d: any) => d.id));
         }
       } catch (error) {
         console.error("Failed to load devices:", error);

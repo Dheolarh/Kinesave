@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router";
 import { motion } from "motion/react";
 import { ArrowLeft } from "lucide-react";
+import { updateUserProfile } from "../utils/storage";
 
 export default function AboutUser() {
     const navigate = useNavigate();
@@ -10,19 +11,17 @@ export default function AboutUser() {
     const [homeType, setHomeType] = useState("");
     const [isSaving, setIsSaving] = useState(false);
 
-    const handleContinue = async () => {
+    const handleContinue = () => {
         setIsSaving(true);
 
         try {
-            // Save aboutUser data to backend JSON
-            const { updateUserProfile } = await import("../utils/dataBrain");
-            await updateUserProfile({
+            // Save aboutUser data to localStorage
+            updateUserProfile({
                 aboutUser: {
                     householdSize: parseInt(householdSize),
                     occupationType,
                     homeType,
                 },
-                savedAt: new Date().toISOString(),
             });
 
             // Profile complete, navigate to dashboard

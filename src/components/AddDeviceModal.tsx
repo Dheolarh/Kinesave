@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { X, Wind, Droplets, Flame, Fan, Search, Check, Zap, Tv, PlusCircle } from "lucide-react";
-import { searchDevices, addDevice, submitSurvey, type EnergyStarDevice } from "../utils/api";
+import energyStarService, { type DeviceSpec } from "../services/energy-star.service";
 
 interface AddDeviceModalProps {
   isOpen: boolean;
@@ -75,14 +75,15 @@ export default function AddDeviceModal({ isOpen, onClose, onAdd }: AddDeviceModa
     setError(null);
 
     try {
-      const result = await searchDevices({
+      // Search local Energy Star database
+      const results = await energyStarService.searchDevices({
         deviceType,
         brand: brand.trim(),
         model: model.trim() || undefined,
       });
 
-      if (result.found && result.devices.length > 0) {
-        setSearchResults(result.devices);
+      if (results && results.length > 0) {
+        setSearchResults(results);
         setStage("results");
       } else {
         setError("No devices found. Try a different brand or model.");
@@ -95,7 +96,7 @@ export default function AddDeviceModal({ isOpen, onClose, onAdd }: AddDeviceModa
     }
   };
 
-  const handleSelectDevice = (device: EnergyStarDevice) => {
+  const handleSelectDevice = (device: DeviceSpec) => {
     setSelectedDevice(device);
   };
 
@@ -114,47 +115,34 @@ export default function AddDeviceModal({ isOpen, onClose, onAdd }: AddDeviceModa
     );
   };
 
-  const handleCompleteSurvey = async () => {
+  const handleCompleteSurvey = () => {
     if (!selectedDevice || !frequency || !hoursPerDay || usageTimes.length === 0 || !customName.trim() || !priority) return;
 
     setIsSubmittingSurvey(true);
     try {
-      // 1. Add Device
-      const userName = localStorage.getItem("userName") || "user";
-      const addResponse = await addDevice({
+      // Create device object with survey data
+      const deviceData = {
+        id: `dev_${Date.now()}_${Math.random()}`,
+        customName: customName.trim(),
+        originalName: selectedDevice.productName,
+        deviceType: deviceType || selectedDevice.category,
         brand: selectedDevice.brand,
         modelNumber: selectedDevice.modelNumber,
-        productName: selectedDevice.productName,
-        deviceType: deviceType || selectedDevice.category,
-        room: room || "Unassigned", // Use selected room or default
-        customName: customName.trim(),
-        priority: priority, // NEW: Include priority
-        userName, // Include userName for file identification
-        energyStarSpecs: {
-          annualEnergyUse: selectedDevice.annualEnergyUse,
-          energyStarRating: selectedDevice.energyStarRating,
-          ...selectedDevice.additionalSpecs,
+        wattage: selectedDevice.powerRating || selectedDevice.additionalSpecs?.powerRatingW || 0,
+        priority: priority,
+        survey: {
+          frequency,
+          hoursPerDay: parseFloat(hoursPerDay),
+          usageTimes,
+          room: room || "Unassigned",
         },
-      });
+      };
 
-      if (!addResponse.device) {
-        throw new Error("Failed to create device");
-      }
-
-      // 2. Submit Survey
-      await submitSurvey(addResponse.device.id, {
-        frequency,
-        hoursPerDay: parseFloat(hoursPerDay),
-        usageTimes,
-        room: room || "Unassigned",
-      });
-
-      // 3. Finish
-      onAdd(addResponse.device, addResponse.device.id);
+      onAdd(deviceData, deviceData.id);
       resetModal();
       onClose();
     } catch (error) {
-      console.error("Error adding device and survey:", error);
+      console.error("Error adding device:", error);
       setError("Failed to save device. Please try again.");
     } finally {
       setIsSubmittingSurvey(false);
@@ -165,6 +153,7 @@ export default function AddDeviceModal({ isOpen, onClose, onAdd }: AddDeviceModa
     { value: "daily", label: "Daily" },
     { value: "frequently", label: "Frequently" },
     { value: "weekends", label: "Weekends" },
+    { value: "rarely", label: "Rarely" },
   ];
 
   const timeOptions = [
@@ -284,17 +273,6 @@ export default function AddDeviceModal({ isOpen, onClose, onAdd }: AddDeviceModa
                     />
                   </div>
 
-                  <div>
-                    <label className="text-sm text-black/60 mb-2 block">Model (Optional)</label>
-                    <input
-                      type="text"
-                      value={model}
-                      onChange={(e) => setModel(e.target.value)}
-                      placeholder="e.g., AR12C, RT38K"
-                      className="w-full px-4 py-3 bg-white/50 backdrop-blur-sm border border-white/60 rounded-2xl text-sm shadow-lg focus:outline-none focus:border-black/30 transition-colors"
-                    />
-                  </div>
-
                   {error && (
                     <div className="text-sm text-red-500 bg-red-50 px-4 py-2 rounded-xl">
                       {error}
@@ -325,7 +303,7 @@ export default function AddDeviceModal({ isOpen, onClose, onAdd }: AddDeviceModa
 
                   <button
                     onClick={() => setStage("manual")}
-                    className="w-full py-3.5 bg-white/60 backdrop-blur-xl border border-white/60 text-black rounded-full text-sm tracking-wide hover:bg-white/70 transition-colors mt-3"
+                    className="w-full py-3.5 bg-white/60 backdrop-blur-xl border border-white/60 text-black rounded-full text-sm tracking-wide hover:bg-white/70 transition-colors mt-3 shadow-lg"
                   >
                     Add Device Manually
                   </button>

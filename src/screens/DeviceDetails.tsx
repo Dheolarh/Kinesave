@@ -1,9 +1,9 @@
 import { useParams, useNavigate } from "react-router";
-import { ArrowLeft, Wind, Droplets, Flame, Fan, TrendingDown, Zap, Thermometer, Edit2, X, Tv } from "lucide-react";
+import { ArrowLeft, Wind, Droplets, Flame, Fan, Zap, Edit2, X, Tv } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { useState, useEffect } from "react";
 import BottomNav from "../components/BottomNav";
-import { getUserDevices, updateDevice } from "../utils/api";
+import { getCurrentUserProfile, updateUserProfile } from "../utils/storage";
 
 const iconMap = {
   ac: Wind,
@@ -39,28 +39,35 @@ export default function DeviceDetails() {
   const [device, setDevice] = useState<any>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [deviceName, setDeviceName] = useState("");
+  const [wattage, setWattage] = useState("");
+  const [priority, setPriority] = useState("");
+  const [frequency, setFrequency] = useState("");
+  const [hoursPerDay, setHoursPerDay] = useState("");
 
   useEffect(() => {
-    // Load device from backend API
-    const loadDevice = async () => {
+    // Load device from localStorage
+    const loadDevice = () => {
       try {
-        const result = await getUserDevices();
-        const foundDevice = result.devices?.find((d: any) => d.id === id);
+        const profile = getCurrentUserProfile();
+        const foundDevice = profile?.devices?.find((d: any) => d.id === id);
 
         if (foundDevice) {
-          const energyData = localStorage.getItem("energyData");
-          const pricePerKwh = energyData ? JSON.parse(energyData).pricePerKwh : 0.15;
-          const devicePower = foundDevice.power || foundDevice.energyStarSpecs?.powerRatingW || 0;
-          const calculatedCosts = calculateDeviceCosts(devicePower, parseFloat(pricePerKwh));
+          const pricePerKwh = profile?.energyCosts?.pricePerKwh || 0.15;
+          const devicePower = foundDevice.wattage || 0;
+          const calculatedCosts = calculateDeviceCosts(devicePower, pricePerKwh);
 
           setDevice({
             ...foundDevice,
             power: devicePower,
-            type: foundDevice.deviceType || foundDevice.type,
+            type: foundDevice.deviceType,
             status: "active",
             ...calculatedCosts,
           });
-          setDeviceName(foundDevice.customName || foundDevice.name);
+          setDeviceName(foundDevice.customName || foundDevice.originalName);
+          setWattage(foundDevice.wattage?.toString() || "");
+          setPriority(String(foundDevice.priority || ""));
+          setFrequency(foundDevice.survey?.frequency || "");
+          setHoursPerDay(foundDevice.survey?.hoursPerDay ? foundDevice.survey.hoursPerDay.toString() : "");
         }
       } catch (error) {
         console.error("Failed to load device:", error);
@@ -73,14 +80,44 @@ export default function DeviceDetails() {
     return null;
   }
 
-  const handleSaveName = async () => {
+  const handleSaveName = () => {
     try {
-      // Update device name via API
-      await updateDevice(id!, { customName: deviceName });
-      setDevice({ ...device, customName: deviceName });
-      setShowEditModal(false);
+      // Update device name and survey data in localStorage
+      const profile = getCurrentUserProfile();
+
+      if (profile) {
+        const updatedDevices = profile.devices.map((d: any) =>
+          d.id === id ? {
+            ...d,
+            customName: deviceName,
+            wattage: parseFloat(wattage) || 0,
+            priority: priority,
+            survey: {
+              ...d.survey,
+              frequency: frequency,
+              hoursPerDay: parseFloat(hoursPerDay) || 0,
+            }
+          } : d
+        );
+        updateUserProfile({ devices: updatedDevices });
+
+        // Update local device state
+        setDevice({
+          ...device,
+          customName: deviceName,
+          wattage: parseFloat(wattage) || 0,
+          power: parseFloat(wattage) || 0,
+          priority: priority,
+          survey: {
+            ...device.survey,
+            frequency: frequency,
+            hoursPerDay: parseFloat(hoursPerDay) || 0,
+          }
+        });
+        setShowEditModal(false);
+      }
     } catch (error) {
-      console.error("Failed to update device name:", error);
+      console.error("Failed to update device:", error);
     }
   };
 
@@ -133,7 +170,6 @@ export default function DeviceDetails() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
           >
-            <Zap className="w-5 h-5 mb-2 text-black/60" strokeWidth={1.5} />
             <div className="text-lg mb-0.5">{device.power}W</div>
             <div className="text-xs text-black/50">Power Rating</div>
           </motion.div>
@@ -144,9 +180,8 @@ export default function DeviceDetails() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.15 }}
           >
-            <TrendingDown className="w-5 h-5 mb-2 text-black/60" strokeWidth={1.5} />
-            <div className="text-lg mb-0.5">{device.efficiency}</div>
-            <div className="text-xs text-black/50">Efficiency</div>
+            <div className="text-lg mb-0.5">{device.priority || "0"}</div>
+            <div className="text-xs text-black/50">Priority</div>
           </motion.div>
 
           <motion.div
@@ -155,9 +190,8 @@ export default function DeviceDetails() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
           >
-            <Thermometer className="w-5 h-5 mb-2 text-black/60" strokeWidth={1.5} />
-            <div className="text-lg mb-0.5">{device.heatOutput}</div>
-            <div className="text-xs text-black/50">Heat Output</div>
+            <div className="text-lg mb-0.5 capitalize">{device.survey?.frequency || "N/A"}</div>
+            <div className="text-xs text-black/50">Use Frequency</div>
           </motion.div>
 
           <motion.div
@@ -166,53 +200,13 @@ export default function DeviceDetails() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.25 }}
           >
-            <div className="text-lg mb-0.5">{device.dailyUsage}</div>
-            <div className="text-xs text-black/50">Daily Usage</div>
+            <div className="text-lg mb-0.5">{device.survey?.hoursPerDay ? `${device.survey.hoursPerDay} hrs/day` : "N/A"}</div>
+            <div className="text-xs text-black/50">Usage Time</div>
           </motion.div>
         </div>
       </div>
 
-      <div className="px-5 py-6 space-y-4">
-        <h2 className="text-xs tracking-wide text-black/60 mb-3">COST ANALYSIS</h2>
 
-        <motion.div
-          className="bg-white/40 backdrop-blur-xl border border-white/60 rounded-3xl p-5 shadow-lg"
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-        >
-          <div className="flex items-baseline gap-2 mb-1">
-            <span className="text-2xl tracking-tight">{device.dailyCost}</span>
-            <span className="text-xs text-black/50">/ day</span>
-          </div>
-          <p className="text-xs text-black/50">Estimated daily cost</p>
-        </motion.div>
-
-        <motion.div
-          className="bg-white/40 backdrop-blur-xl border border-white/60 rounded-3xl p-5 shadow-lg"
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.35 }}
-        >
-          <div className="flex items-baseline gap-2 mb-1">
-            <span className="text-2xl tracking-tight">{device.monthlyCost}</span>
-            <span className="text-xs text-black/50">/ month</span>
-          </div>
-          <p className="text-xs text-black/50">Estimated monthly cost</p>
-        </motion.div>
-
-        <motion.div
-          className="bg-white/60 backdrop-blur-xl border border-white/60 rounded-3xl p-5 shadow-lg"
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-        >
-          <h3 className="text-xs tracking-wide mb-3">OPTIMIZATION TIP</h3>
-          <p className="text-sm leading-relaxed text-black/70">
-            Running this device during off-peak hours (10 PM - 6 AM) could save you up to 15% on energy costs.
-          </p>
-        </motion.div>
-      </div>
 
       <BottomNav active="home" />
 
@@ -228,37 +222,135 @@ export default function DeviceDetails() {
               onClick={() => setShowEditModal(false)}
             />
             <motion.div
-              className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-2xl rounded-t-3xl z-50 px-6 py-6 border-t border-white/60 shadow-[0_-10px_40px_rgba(0,0,0,0.1)]"
+              className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-2xl rounded-t-3xl z-50 border-t border-white/60 shadow-[0_-10px_40px_rgba(0,0,0,0.1)] flex flex-col"
               initial={{ y: "100%" }}
               animate={{ y: 0 }}
               exit={{ y: "100%" }}
               transition={{ type: "spring", damping: 30, stiffness: 300 }}
+              style={{ maxHeight: "85vh" }}
             >
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl tracking-tight">Edit Device Name</h2>
-                <button
-                  onClick={() => setShowEditModal(false)}
-                  className="w-8 h-8 rounded-full border border-black/10 flex items-center justify-center hover:border-black/20 transition-colors"
-                >
-                  <X className="w-4 h-4" strokeWidth={1.5} />
-                </button>
+              {/* Header */}
+              <div className="px-6 pt-6 pb-4 flex-shrink-0">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-xl tracking-tight">Edit Device</h2>
+                  <button
+                    onClick={() => setShowEditModal(false)}
+                    className="w-8 h-8 rounded-full border border-black/10 flex items-center justify-center hover:border-black/20 transition-colors"
+                  >
+                    <X className="w-4 h-4" strokeWidth={1.5} />
+                  </button>
+                </div>
               </div>
 
-              <div className="space-y-5">
-                <div>
-                  <label className="block text-xs text-black/60 mb-2 tracking-wide">
-                    DEVICE NAME
-                  </label>
-                  <input
-                    type="text"
-                    value={deviceName}
-                    onChange={(e) => setDeviceName(e.target.value)}
-                    placeholder="Enter device name"
-                    className="w-full px-4 py-3 bg-white/50 backdrop-blur-sm border border-white/60 rounded-2xl text-sm focus:outline-none focus:border-black/30 transition-colors"
-                    autoFocus
-                  />
-                </div>
+              {/* Scrollable Content */}
+              <div className="px-6 flex-1 overflow-y-auto scrollbar-hide pb-6" style={{ minHeight: 0 }}>
+                <div className="space-y-5">
+                  {/* Device Name */}
+                  <div>
+                    <label className="block text-xs text-black/60 mb-2 pt-4 tracking-wide">
+                      Device Name
+                    </label>
+                    <input
+                      type="text"
+                      value={deviceName}
+                      onChange={(e) => setDeviceName(e.target.value)}
+                      placeholder="Enter device name"
+                      className="w-full px-4 py-3 bg-white/50 backdrop-blur-sm border border-white/60 rounded-xl text-sm shadow-lg focus:outline-none focus:border-black/30 transition-colors"
+                    />
+                  </div>
 
+                  {/* Wattage */}
+                  <div>
+                    <label className="block text-xs text-black/60 mb-2 tracking-wide">
+                      Power Rating (Watts)
+                    </label>
+                    <input
+                      type="number"
+                      value={wattage}
+                      onChange={(e) => setWattage(e.target.value)}
+                      placeholder="e.g., 2000"
+                      min="0"
+                      className="w-full px-4 py-3 bg-white/50 backdrop-blur-sm border border-white/60 rounded-xl text-sm shadow-lg focus:outline-none focus:border-black/30 transition-colors"
+                    />
+                  </div>
+
+                  {/* Priority - Range Slider */}
+                  <div>
+                    <label className="block text-xs text-black/60 mb-2 tracking-wide">
+                      Priority
+                    </label>
+                    <div className="bg-white/40 backdrop-blur-xl border border-white/60 rounded-2xl p-4 shadow-lg">
+                      <input
+                        type="range"
+                        min="0"
+                        max="5"
+                        step="1"
+                        value={priority || 0}
+                        onChange={(e) => setPriority(e.target.value)}
+                        style={{
+                          accentColor: '#000000',
+                        }}
+                        className="w-full h-2 rounded-full appearance-none cursor-pointer"
+                      />
+                      <div className="flex justify-between mt-3 text-xs text-black/40">
+                        <span>0</span>
+                        <span>1</span>
+                        <span>2</span>
+                        <span>3</span>
+                        <span>4</span>
+                        <span>5</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Frequency - Button Grid */}
+                  <div>
+                    <label className="block text-xs text-black/60 mb-2 tracking-wide">
+                      Use Frequency
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {["daily", "weekends", "frequently", "rarely"].map((freq) => (
+                        <button
+                          key={freq}
+                          onClick={() => setFrequency(freq)}
+                          className={`p-3 rounded-xl text-xs shadow-lg hover:shadow-xl transition-all border capitalize ${frequency === freq
+                            ? "bg-black text-white border-black"
+                            : "bg-white/40 border-white/60 hover:bg-white/50"
+                            }`}
+                        >
+                          {freq}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Usage Time */}
+                  <div>
+                    <label className="block text-xs text-black/60 mb-2 tracking-wide">
+                      Usage Time(hours/day)
+                    </label>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={hoursPerDay}
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/[^0-9.]/g, '');
+                        setHoursPerDay(value);
+                      }}
+                      onBlur={() => {
+                        const val = parseFloat(hoursPerDay);
+                        if (val < 0) setHoursPerDay("0");
+                        if (val > 24) setHoursPerDay("24");
+                      }}
+                      placeholder="e.g., 8 (hours), 0.2 (20 minutes)"
+                      className="w-full px-4 py-3 bg-white/50 backdrop-blur-sm border border-white/60 rounded-xl text-sm shadow-lg focus:outline-none focus:border-black/30 transition-colors"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Save Button - Fixed at bottom */}
+              <div className="px-6 py-4 flex-shrink-0">
                 <button
                   onClick={handleSaveName}
                   disabled={!deviceName.trim()}

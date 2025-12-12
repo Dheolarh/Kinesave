@@ -3,7 +3,7 @@ import { useNavigate } from "react-router";
 import BottomNav from "../components/BottomNav";
 import FloatingAIRing from "../components/FloatingAIRing";
 import AddDeviceModal from "../components/AddDeviceModal";
-import { getCurrentUserId } from "../utils/dataBrain";
+import { getCurrentUserId, getCurrentUserProfile, updateUserProfile } from "../utils/storage";
 import { Plus, Wind, Droplets, Flame, Fan, CloudSun, Tv, Zap, X } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
@@ -37,30 +37,35 @@ export default function Dashboard() {
   const [showUserId, setShowUserId] = useState(false);
   const [userId, setUserId] = useState<string>("");
 
-  // Load devices from backend API
+  // Load devices
   useEffect(() => {
     loadData();
-    // Load userId from sessionStorage
+    // Load userId from localStorage
     const storedUserId = getCurrentUserId() || "";
     setUserId(storedUserId);
   }, []);
 
-  const loadData = async () => {
+  const loadData = () => {
     try {
       setLoading(true);
 
-      // Load complete user profile from backend JSON
-      const { getUserProfile } = await import("../utils/dataBrain");
-      const profileData = await getUserProfile();
+      // Load complete user profile from localStorage
+      const profile = getCurrentUserProfile();
+
+      if (!profile) {
+        console.error("No user profile found");
+        setLoading(false);
+        return;
+      }
 
       // Set location
-      if (profileData.data.location) {
-        setLocation(profileData.data.location);
+      if (profile.location) {
+        setLocation(profile.location);
       }
 
       // Set devices  
-      if (profileData.data.devices) {
-        setDevices(profileData.data.devices);
+      if (profile.devices) {
+        setDevices(profile.devices);
       }
 
       // Load active plan (still from localStorage for now)
@@ -76,9 +81,25 @@ export default function Dashboard() {
   };
 
   const handleAddDevice = (device: any) => {
-    // Device already added to backend, just refresh
-    loadData();
-    setShowAddModal(false);
+    try {
+      // Get current profile
+      const profile = getCurrentUserProfile();
+
+      if (profile) {
+        // Add new device to existing devices
+        const updatedDevices = [...(profile.devices || []), device];
+
+        // Save to localStorage
+        updateUserProfile({ devices: updatedDevices });
+
+        // Reload dashboard to show new device
+        loadData();
+      }
+
+      setShowAddModal(false);
+    } catch (error) {
+      console.error("Failed to add device:", error);
+    }
   };
 
   // Long press handlers
@@ -97,27 +118,30 @@ export default function Dashboard() {
   };
 
   // Delete device
-  const handleDeleteDevice = async () => {
+  const handleDeleteDevice = () => {
     if (!longPressDevice) return;
 
     setIsDeleting(true);
     try {
-      const userName = localStorage.getItem("userName") || "user";
-      const response = await fetch(`http://localhost:3001/api/devices/${longPressDevice.id}?userName=${userName}`, {
-        method: 'DELETE',
-      });
+      // Delete from localStorage
+      const profile = getCurrentUserProfile();
 
-      if (!response.ok) {
-        throw new Error('Failed to delete device');
+      if (profile) {
+        // Remove device from array
+        const updatedDevices = profile.devices.filter((d: any) => d.id !== longPressDevice.id);
+
+        // Save back to localStorage
+        updateUserProfile({ devices: updatedDevices });
+
+        // Update UI
+        setDevices(updatedDevices);
       }
 
-      // Refresh devices list
-      await loadData();
       setShowDeleteModal(false);
       setLongPressDevice(null);
     } catch (error) {
-      console.error('Error deleting device:', error);
-      alert('Failed to delete device. Please try again.');
+      console.error("Failed to delete device:", error);
+      alert("Failed to delete device. Please try again.");
     } finally {
       setIsDeleting(false);
     }
@@ -296,7 +320,7 @@ export default function Dashboard() {
                       {longPressDevice.customName || longPressDevice.name}
                     </p>
                     <p className="text-xs text-black/50">
-                      {longPressDevice.additionalSpecs?.powerRatingW || longPressDevice.power || 0}W
+                      {longPressDevice.wattage || 0}W
                     </p>
                   </div>
 

@@ -1,15 +1,9 @@
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router";
 import { motion, AnimatePresence } from "motion/react";
 import { MapPin, AlertCircle, Search, X } from "lucide-react";
-import {
-  detectLocation,
-  getLocationFromStorage,
-  searchLocation,
-  getWeatherData,
-  type LocationData,
-  type LocationSearchResult
-} from "../utils/location";
+import { detectLocation, searchLocation, getWeatherData, getLocationFromStorage, type LocationData, type LocationSearchResult } from "../utils/location";
+import { updateUserProfile } from "../utils/storage";
 
 export default function LocationDetection() {
   const navigate = useNavigate();
@@ -119,12 +113,11 @@ export default function LocationDetection() {
     }
   };
 
-  const handleContinue = async () => {
+  const handleContinue = () => {
     try {
       if (locationData) {
-        // Save location to backend JSON
-        const { updateUserProfile } = await import("../utils/dataBrain");
-        await updateUserProfile({
+        // Save location to localStorage
+        updateUserProfile({
           location: {
             city: locationData.city,
             region: locationData.region,
@@ -132,7 +125,7 @@ export default function LocationDetection() {
             latitude: locationData.lat || 0,
             longitude: locationData.lon || 0,
             temperature: locationData.temperature,
-            weatherDescription: locationData.weatherDescription,
+            weatherDescription: locationData.weatherDescription || "",
           },
         });
       }
@@ -198,12 +191,12 @@ export default function LocationDetection() {
               >
                 <p className="text-sm mb-2 text-black/70 font-medium">
                   {locationData.city}
-                  {locationData.region && `, ${locationData.region}`}
-                  {locationData.country && `, ${locationData.country}`}
+                  {locationData.region && `, ${locationData.region} `}
+                  {locationData.country && `, ${locationData.country} `}
                 </p>
                 <p className="text-xs mb-6 text-black/50">
                   {locationData.temperature}°C • {locationData.humidity}% humidity
-                  {locationData.weatherDescription && ` • ${locationData.weatherDescription}`}
+                  {locationData.weatherDescription && ` • ${locationData.weatherDescription} `}
                 </p>
                 <button
                   onClick={handleContinue}
@@ -289,7 +282,7 @@ export default function LocationDetection() {
                         whileTap={{ scale: 0.98 }}
                       >
                         <div className="text-sm font-medium text-black/80">
-                          {result.city}{result.region && `, ${result.region}`}
+                          {result.city}{result.region && `, ${result.region} `}
                         </div>
                         <div className="text-xs text-black/50 mt-0.5 truncate">
                           {result.displayName}

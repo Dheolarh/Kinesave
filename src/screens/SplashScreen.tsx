@@ -1,16 +1,41 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { motion } from "motion/react";
-import { createUserProfile, setCurrentUserId } from "../utils/dataBrain";
+import {
+  getCurrentUserId,
+  getCurrentUserProfile,
+  createUserProfile,
+  getProfileCompletionStatus
+} from "../utils/storage";
 
 export default function SplashScreen() {
   const navigate = useNavigate();
   const [name, setName] = useState("");
   const [isCreating, setIsCreating] = useState(false);
 
-  // Clear sessionStorage when splash screen loads
+  // Check for existing user on mount
   useEffect(() => {
-    sessionStorage.clear();
+    const checkExistingUser = () => {
+      const userId = getCurrentUserId();
+
+      if (!userId) {
+        // No user - show name input for new user
+        return;
+      }
+
+      // User exists - load profile and route
+      const profile = getCurrentUserProfile();
+      if (!profile) {
+        // Corrupt data - clear and start fresh
+        localStorage.removeItem('currentUserId');
+        return;
+      }
+
+      // Route based on completion
+      routeUserBasedOnProfile(profile);
+    };
+
+    checkExistingUser();
   }, []);
 
   // Generate 15 random digits
@@ -22,20 +47,48 @@ export default function SplashScreen() {
     return digits;
   };
 
-  const handleProceed = async () => {
+  const routeUserBasedOnProfile = (profile: any) => {
+    const status = getProfileCompletionStatus(profile);
+
+    // All empty - normal flow
+    if (!status.hasLocation && !status.hasEnergyCosts && !status.hasAboutUser) {
+      navigate("/location");
+      return;
+    }
+
+    // Has data but missing location
+    if (!status.hasLocation && status.hasEnergyCosts && status.hasAboutUser) {
+      navigate("/dashboard", { state: { showLocationSetup: true } });
+      return;
+    }
+
+    // Missing energy costs
+    if (!status.hasEnergyCosts) {
+      navigate("/setup");
+      return;
+    }
+
+    // Missing about user
+    if (!status.hasAboutUser) {
+      navigate("/about-user");
+      return;
+    }
+
+    // Everything complete
+    navigate("/dashboard");
+  };
+
+  const handleProceed = () => {
     if (name.trim() && name.trim().length >= 3 && !isCreating) {
       setIsCreating(true);
 
       try {
         const sanitizedName = name.trim().toLowerCase().replace(/\s+/g, '_');
         const randomDigits = generate15Digits();
-        const userId = `${sanitizedName}_${randomDigits}`;
+        const userId = `${sanitizedName}_${randomDigits} `;
 
-        // Create user profile in backend (creates JSON file)
-        await createUserProfile(name.trim(), userId);
-
-        // Store userId in sessionStorage for this session
-        setCurrentUserId(userId);
+        // Create user profile in localStorage (stores as JSON)
+        createUserProfile(name.trim(), userId);
 
         // Navigate to location detection
         navigate("/location");

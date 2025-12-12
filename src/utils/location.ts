@@ -73,16 +73,21 @@ export async function reverseGeocode(lat: number, lon: number): Promise<{
     country: string;
 }> {
     try {
-        // Nominatim reverse geocoding API (OpenStreetMap)
-        // Must include User-Agent header as per usage policy
+        // Add timeout to prevent hanging
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
         const response = await fetch(
             `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&addressdetails=1`,
             {
+                signal: controller.signal,
                 headers: {
                     'User-Agent': 'KineSave/1.0 (Energy Optimization App)',
                 },
             }
         );
+
+        clearTimeout(timeoutId);
 
         if (!response.ok) {
             throw new Error('Geocoding failed');
@@ -93,19 +98,12 @@ export async function reverseGeocode(lat: number, lon: number): Promise<{
         if (data && data.address) {
             const addr = data.address;
             return {
-                // Check suburb/neighbourhood first for specific areas, then fall back to city
                 city: addr.suburb || addr.neighbourhood || addr.city || addr.town || addr.village || addr.hamlet || addr.municipality || 'Unknown',
                 region: addr.state || addr.county || addr.region || '',
                 country: addr.country || '',
             };
         }
-
-        // Fallback if no results
-        return {
-            city: 'Unknown Location',
-            region: '',
-            country: '',
-        };
+        throw new Error('No address data found');
     } catch (error) {
         console.error('Reverse geocoding error:', error);
         throw new Error('Failed to get location name');
