@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
-import { motion, AnimatePresence } from "motion/react";
+import { motion } from "motion/react";
 import { Check, Wind, Droplets, Flame, Fan, ArrowLeft, Tv, Zap } from "lucide-react";
 import Orb from "../components/Orb";
 import { getCurrentUserProfile } from "../utils/storage";
@@ -67,12 +67,12 @@ export default function AIAnalysis() {
     if (stage === "analyzing" && currentStep < analysisSteps.length) {
       const timer = setTimeout(() => {
         setCurrentStep(currentStep + 1);
-      }, 800);
+      }, 2000); // Increased to 2 seconds per step
       return () => clearTimeout(timer);
     } else if (stage === "analyzing" && currentStep >= analysisSteps.length) {
       const completeTimer = setTimeout(() => {
         setStage("complete");
-      }, 500);
+      }, 1000);
       return () => clearTimeout(completeTimer);
     }
   }, [stage, currentStep]);
@@ -165,93 +165,34 @@ export default function AIAnalysis() {
     );
   }
 
+  // Analyzing or Complete Stage - Show Orb with progress messages
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex flex-col items-center justify-center px-6 overflow-y-auto scrollbar-hide">
-      <motion.div
-        className="text-center max-w-sm"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-      >
-        <motion.div
-          className="w-32 h-32 mx-auto mb-8 relative"
-          animate={{
-            scale: stage === "complete" ? [1, 1.1, 1] : 1,
-          }}
-          transition={{
-            duration: 0.5,
-          }}
-        >
-          <AnimatePresence mode="wait">
-            {stage === "complete" ? (
-              <motion.div
-                key="check"
-                className="w-full h-full bg-white rounded-3xl flex items-center justify-center shadow-lg"
-                initial={{ scale: 0, rotate: -180 }}
-                animate={{ scale: 1, rotate: 0 }}
-                transition={{ type: "spring", stiffness: 200 }}
-              >
-                <Check className="w-16 h-16" strokeWidth={2} />
-              </motion.div>
-            ) : (
-              <motion.div
-                key="orb"
-                className="w-full h-full bg-white rounded-3xl flex items-center justify-center shadow-lg p-6"
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ type: "spring", stiffness: 200 }}
-              >
-                <Orb
-                  hoverIntensity={0.3}
-                  rotateOnHover={false}
-                  hue={0}
-                  forceHoverState={true}
-                />
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </motion.div>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-8">
+      <div className="w-full max-w-lg aspect-square relative">
+        <Orb
+          hue={0}
+          hoverIntensity={0.3}
+          rotateOnHover={true}
+          forceHoverState={true}
+        />
 
-        <h2 className="text-2xl mb-3 tracking-tight">
-          {stage === "complete" ? "Analysis Complete" : "Analyzing Your Devices..."}
-        </h2>
-
-        <p className="text-sm text-black/60 mb-8">
-          {stage === "complete"
-            ? "We've found the best plans for you"
-            : "This will only take a moment"}
-        </p>
-
-        <div className="space-y-3 text-left">
-          {analysisSteps.map((step, index) => (
-            <motion.div
-              key={index}
-              className="flex items-center gap-3"
-              initial={{ opacity: 0, x: -10 }}
-              animate={{
-                opacity: index <= currentStep ? 1 : 0.3,
-                x: 0,
-              }}
-              transition={{ delay: index * 0.1 }}
-            >
-              <div
-                className={`w-5 h-5 rounded-full border flex items-center justify-center flex-shrink-0 transition-colors ${index < currentStep
-                  ? "border-black bg-black"
-                  : index === currentStep
-                    ? "border-black"
-                    : "border-black/20"
-                  }`}
-              >
-                {index < currentStep && (
-                  <Check className="w-3 h-3 text-white" strokeWidth={2.5} />
-                )}
-              </div>
-              <span className={`text-sm ${index <= currentStep ? "" : "text-black/40"}`}>
-                {step}
-              </span>
-            </motion.div>
-          ))}
+        {/* Progress message overlay in center of Orb */}
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <motion.div
+            key={currentStep}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="text-center px-6"
+          >
+            <p className="text-sm text-black/70 font-medium tracking-wide">
+              {stage === "complete"
+                ? "Analysis Complete!"
+                : analysisSteps[currentStep] || "Preparing analysis..."}
+            </p>
+          </motion.div>
         </div>
-      </motion.div>
+      </div>
     </div>
   );
 }
