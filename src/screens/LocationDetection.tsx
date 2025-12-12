@@ -7,7 +7,6 @@ import {
   getLocationFromStorage,
   searchLocation,
   getWeatherData,
-  saveLocationToStorage,
   type LocationData,
   type LocationSearchResult
 } from "../utils/location";
@@ -110,7 +109,6 @@ export default function LocationDetection() {
         ...weatherData,
       };
 
-      saveLocationToStorage(fullLocationData);
       setLocationData(fullLocationData);
       setError(null);
       setLoading(false);
@@ -118,6 +116,32 @@ export default function LocationDetection() {
       setLoading(false);
       setError("Failed to fetch weather data for selected location.");
       console.error("Weather fetch error:", err);
+    }
+  };
+
+  const handleContinue = async () => {
+    try {
+      if (locationData) {
+        // Save location to backend JSON
+        const { updateUserProfile } = await import("../utils/dataBrain");
+        await updateUserProfile({
+          location: {
+            city: locationData.city,
+            region: locationData.region,
+            country: locationData.country,
+            latitude: locationData.lat || 0,
+            longitude: locationData.lon || 0,
+            temperature: locationData.temperature,
+            weatherDescription: locationData.weatherDescription,
+          },
+        });
+      }
+
+      // Navigate to energy setup
+      navigate("/setup");
+    } catch (error) {
+      console.error("Failed to save location:", error);
+      alert("Failed to save location. Please try again.");
     }
   };
 
@@ -182,7 +206,7 @@ export default function LocationDetection() {
                   {locationData.weatherDescription && ` • ${locationData.weatherDescription}`}
                 </p>
                 <button
-                  onClick={() => navigate("/setup")}
+                  onClick={handleContinue}
                   className="px-8 py-3 bg-black text-white rounded-full text-sm tracking-wide hover:bg-black/90 transition-colors"
                 >
                   Continue

@@ -2,8 +2,6 @@ import { useState } from "react";
 import { useNavigate } from "react-router";
 import { motion } from "motion/react";
 import { ArrowLeft } from "lucide-react";
-import { saveCompleteUserData } from "../utils/api";
-import { getLocationFromStorage } from "../utils/location";
 
 export default function AboutUser() {
     const navigate = useNavigate();
@@ -16,75 +14,22 @@ export default function AboutUser() {
         setIsSaving(true);
 
         try {
-            // Gather all data from different sources
-            const userName = localStorage.getItem("userName") || "user";
-            const userId = localStorage.getItem("userId") || "";
-            const location = getLocationFromStorage();
-            const energyData = JSON.parse(localStorage.getItem("energyData") || "{}");
-
-            // Load devices from localStorage (where setup saved them)
-            const devicesList = JSON.parse(localStorage.getItem("userDevices") || "[]");
-
-            // Create consolidated user data structure
-            const completeUserData = {
-                userName,
-                userId,    // Include userId for database migration
-                location: {
-                    city: location?.city || "",
-                    region: location?.region || "",
-                    country: location?.country || "",
-                    latitude: (location as any)?.latitude || 0,
-                    longitude: (location as any)?.longitude || 0,
-                    temperature: location?.temperature || 0,
-                    weatherDescription: location?.weatherDescription || "",
-                },
-                energyCosts: {
-                    monthlyCost: energyData.monthlyCost || 0,
-                    pricePerKwh: energyData.pricePerKwh || 0,
-                    powerHoursPerDay: energyData.powerHoursPerDay || 8,
-                    availableKwhPerMonth: energyData.availableKwhPerMonth || 0,
-                    currency: energyData.currency || "NGN",
-                    currencySymbol: energyData.currencySymbol || "₦",
-                },
-                devices: devicesList.map((device: any) => ({
-                    id: device.id || `dev_${Date.now()}_${Math.random()}`, // Ensure ID exists
-                    customName: device.customName || device.productName,
-                    originalName: device.productName,
-                    deviceType: device.deviceType,
-                    brand: device.brand || "Unknown",
-                    modelNumber: device.modelNumber || "N/A",
-                    wattage: device.energyStarSpecs?.powerRatingW || device.power || 0,
-                    priority: device.priority || 0,
-                    survey: device.survey || {
-                        frequency: "daily",
-                        hoursPerDay: 0,
-                        usageTimes: [],
-                        room: device.room || "Unassigned",
-                    },
-                })),
+            // Save aboutUser data to backend JSON
+            const { updateUserProfile } = await import("../utils/dataBrain");
+            await updateUserProfile({
                 aboutUser: {
                     householdSize: parseInt(householdSize),
                     occupationType,
                     homeType,
                 },
                 savedAt: new Date().toISOString(),
-            };
+            });
 
-            // Save to backend
-            await saveCompleteUserData(completeUserData);
-
-            // Clear temporary localStorage data (keep userName only)
-            localStorage.removeItem("energyData");
-            localStorage.removeItem("locationData");
-            localStorage.removeItem("userData");
-            localStorage.removeItem("userDevices");
-
-            // Navigate to dashboard
+            // Profile complete, navigate to dashboard
             navigate("/dashboard");
         } catch (error) {
             console.error("Error saving user data:", error);
-            alert("Failed to save user data. Please try again.");
-        } finally {
+            alert("Failed to save data. Please try again.");
             setIsSaving(false);
         }
     };

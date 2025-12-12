@@ -96,7 +96,156 @@ export class UserDataController {
     }
 
     /**
-     * Get user data from JSON file
+     * Create initial user profile
+     * POST /api/userdata/create
+     */
+    async createUserProfile(req: Request, res: Response) {
+        try {
+            const { userName, userId } = req.body;
+
+            if (!userName || !userId) {
+                return res.status(400).json({
+                    success: false,
+                    error: 'userName and userId are required',
+                });
+            }
+
+            // Save userId to tracking file
+            saveUserIdToTracking(userId);
+
+            // Create initial user profile structure
+            const initialProfile = {
+                userName,
+                userId,
+                location: null,
+                energyCosts: null,
+                devices: [],
+                aboutUser: null,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+            };
+
+            const userFile = this.getUserFilePath(userName, userId);
+
+            // Write to file
+            fs.writeFileSync(
+                userFile,
+                JSON.stringify(initialProfile, null, 2),
+                'utf-8'
+            );
+
+            res.json({
+                success: true,
+                message: 'User profile created successfully',
+                userId,
+                fileName: path.basename(userFile),
+            });
+        } catch (error) {
+            console.error('Error creating user profile:', error);
+            res.status(500).json({
+                success: false,
+                error: 'Failed to create user profile',
+            });
+        }
+    }
+
+    /**
+     * Update user profile with partial data
+     * PATCH /api/userdata/update
+     */
+    async updateUserProfile(req: Request, res: Response) {
+        try {
+            const { userId, ...updates } = req.body;
+
+            if (!userId) {
+                return res.status(400).json({
+                    success: false,
+                    error: 'userId is required',
+                });
+            }
+
+            // Find the user file by userId
+            const userFile = this.getUserFilePath('', userId);
+
+            if (!fs.existsSync(userFile)) {
+                return res.status(404).json({
+                    success: false,
+                    error: 'User profile not found',
+                });
+            }
+
+            // Read existing data
+            const existingData = JSON.parse(fs.readFileSync(userFile, 'utf-8'));
+
+            // Merge updates
+            const updatedData = {
+                ...existingData,
+                ...updates,
+                updatedAt: new Date().toISOString(),
+            };
+
+            // Write back to file
+            fs.writeFileSync(
+                userFile,
+                JSON.stringify(updatedData, null, 2),
+                'utf-8'
+            );
+
+            res.json({
+                success: true,
+                message: 'User profile updated successfully',
+                data: updatedData,
+            });
+        } catch (error) {
+            console.error('Error updating user profile:', error);
+            res.status(500).json({
+                success: false,
+                error: 'Failed to update user profile',
+            });
+        }
+    }
+
+    /**
+     * Get user profile by userId
+     * GET /api/userdata/profile?userId=xxx
+     */
+    async getUserProfile(req: Request, res: Response) {
+        try {
+            const { userId } = req.query;
+
+            if (!userId || typeof userId !== 'string') {
+                return res.status(400).json({
+                    success: false,
+                    error: 'userId is required',
+                });
+            }
+
+            const userFile = this.getUserFilePath('', userId);
+
+            if (!fs.existsSync(userFile)) {
+                return res.status(404).json({
+                    success: false,
+                    error: 'User profile not found',
+                });
+            }
+
+            const userData = JSON.parse(fs.readFileSync(userFile, 'utf-8'));
+
+            res.json({
+                success: true,
+                data: userData,
+            });
+        } catch (error) {
+            console.error('Error getting user profile:', error);
+            res.status(500).json({
+                success: false,
+                error: 'Failed to get user profile',
+            });
+        }
+    }
+
+    /**
+     * Get user data from JSON file (legacy endpoint)
      * GET /api/userdata?userName=Takeda
      */
     async getUserData(req: Request, res: Response) {
@@ -122,3 +271,5 @@ export class UserDataController {
         }
     }
 }
+
+export default new UserDataController();

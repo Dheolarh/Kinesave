@@ -3,8 +3,7 @@ import { useNavigate } from "react-router";
 import BottomNav from "../components/BottomNav";
 import FloatingAIRing from "../components/FloatingAIRing";
 import AddDeviceModal from "../components/AddDeviceModal";
-import { getUserDevices } from "../utils/api";
-import { getLocationFromStorage } from "../utils/location";
+import { getCurrentUserId } from "../utils/dataBrain";
 import { Plus, Wind, Droplets, Flame, Fan, CloudSun, Tv, Zap, X } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
@@ -41,8 +40,8 @@ export default function Dashboard() {
   // Load devices from backend API
   useEffect(() => {
     loadData();
-    // Load userId from localStorage
-    const storedUserId = localStorage.getItem("userId") || "";
+    // Load userId from sessionStorage
+    const storedUserId = getCurrentUserId() || "";
     setUserId(storedUserId);
   }, []);
 
@@ -50,17 +49,21 @@ export default function Dashboard() {
     try {
       setLoading(true);
 
-      // Load location
-      const savedLocation = getLocationFromStorage();
-      if (savedLocation) {
-        setLocation(savedLocation);
+      // Load complete user profile from backend JSON
+      const { getUserProfile } = await import("../utils/dataBrain");
+      const profileData = await getUserProfile();
+
+      // Set location
+      if (profileData.data.location) {
+        setLocation(profileData.data.location);
       }
 
-      // Load devices from backend
-      const result = await getUserDevices();
-      setDevices(result.devices || []);
+      // Set devices  
+      if (profileData.data.devices) {
+        setDevices(profileData.data.devices);
+      }
 
-      // Load active plan
+      // Load active plan (still from localStorage for now)
       const savedPlan = localStorage.getItem("activePlan");
       if (savedPlan) {
         setActivePlan(JSON.parse(savedPlan));
@@ -122,14 +125,14 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 pb-20 overflow-y-auto scrollbar-hide">
-      <div className="px-5 pt-8 pb-6">
+      <div className="px-5 pt-4 pb-6">
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
         >
           {/* Header */}
-          <div className="px-5 pt-8 pb-4">
+          <div className="px-3 pt-2 pb-4">
             <h1
               className="text-2xl mb-2 tracking-tight font-semibold cursor-pointer select-none"
               onDoubleClick={() => setShowUserId(!showUserId)}
@@ -143,7 +146,7 @@ export default function Dashboard() {
             <div className="flex items-center justify-between text-sm text-black/60">
               <div>{location?.city || 'Location'}, {location?.region || 'Unknown'}</div>
               <div className="flex items-center gap-2">
-                <span>{location?.temperature || '—'}°C • {location?.humidity || '—'}%</span>
+                <span>{location?.temperature || '—'}°C • {location?.weatherDescription || '—'}</span>
                 <CloudSun className="w-4 h-4" strokeWidth={1.5} />
               </div>
             </div>

@@ -1,14 +1,16 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { motion } from "motion/react";
+import { createUserProfile, setCurrentUserId } from "../utils/dataBrain";
 
 export default function SplashScreen() {
   const navigate = useNavigate();
   const [name, setName] = useState("");
+  const [isCreating, setIsCreating] = useState(false);
 
-  // Clear all localStorage when splash screen loads (fresh start for new user)
+  // Clear sessionStorage when splash screen loads
   useEffect(() => {
-    localStorage.clear();
+    sessionStorage.clear();
   }, []);
 
   // Generate 15 random digits
@@ -20,16 +22,28 @@ export default function SplashScreen() {
     return digits;
   };
 
-  const handleProceed = () => {
-    if (name.trim() && name.trim().length >= 3) {
-      const sanitizedName = name.trim().toLowerCase().replace(/\s+/g, '_');
-      const randomDigits = generate15Digits();
-      const userId = `${sanitizedName}_${randomDigits}`;
+  const handleProceed = async () => {
+    if (name.trim() && name.trim().length >= 3 && !isCreating) {
+      setIsCreating(true);
 
-      // Save the new username and userId to localStorage
-      localStorage.setItem("userName", name.trim());
-      localStorage.setItem("userId", userId);
-      navigate("/location");
+      try {
+        const sanitizedName = name.trim().toLowerCase().replace(/\s+/g, '_');
+        const randomDigits = generate15Digits();
+        const userId = `${sanitizedName}_${randomDigits}`;
+
+        // Create user profile in backend (creates JSON file)
+        await createUserProfile(name.trim(), userId);
+
+        // Store userId in sessionStorage for this session
+        setCurrentUserId(userId);
+
+        // Navigate to location detection
+        navigate("/location");
+      } catch (error) {
+        console.error("Failed to create user profile:", error);
+        alert("Failed to create profile. Please try again.");
+        setIsCreating(false);
+      }
     }
   };
 
@@ -75,10 +89,10 @@ export default function SplashScreen() {
 
           <button
             onClick={handleProceed}
-            disabled={!name.trim() || name.trim().length < 3}
+            disabled={!name.trim() || name.trim().length < 3 || isCreating}
             className="w-full py-3.5 bg-black text-white rounded-full text-sm tracking-wide hover:bg-black/90 transition-colors disabled:opacity-30 disabled:cursor-not-allowed shadow-lg"
           >
-            Proceed
+            {isCreating ? "Creating Profile..." : "Proceed"}
           </button>
         </motion.div>
       </motion.div>

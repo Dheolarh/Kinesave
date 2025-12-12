@@ -157,13 +157,13 @@ export default function EnergyCostSetup() {
     }));
   };
 
-  const handleProceedToDashboard = () => {
-    // Calculate available kWh per month
+  const handleProceed = async () => {
+    // Calculate
     const monthlyPurchase = parseFloat(monthlyCost);
     const price = parseFloat(pricePerKwh);
     const availableKwhPerMonth = monthlyPurchase / price;
 
-    // Save energy cost data and devices to localStorage
+    // Prepare energy cost data
     const energyData = {
       monthlyCost: parseFloat(monthlyCost),
       pricePerKwh: parseFloat(pricePerKwh),
@@ -172,13 +172,40 @@ export default function EnergyCostSetup() {
       availableKwhPerMonth: availableKwhPerMonth,
       currency: currency.code,
       currencySymbol: currency.symbol,
-      location: locationDisplay,
     };
-    localStorage.setItem("energyData", JSON.stringify(energyData));
-    localStorage.setItem("userDevices", JSON.stringify(selectedDevices));
 
-    // Navigate to about user page
-    navigate("/about-user");
+    // Prepare devices data
+    const devicesData = selectedDevices.map(device => ({
+      id: device.id || `dev_${Date.now()}_${Math.random()}`,
+      customName: device.customName || device.productName,
+      originalName: device.productName,
+      deviceType: device.deviceType,
+      brand: device.brand || "Unknown",
+      modelNumber: device.modelNumber || "N/A",
+      wattage: device.energyStarSpecs?.powerRatingW || device.power || 0,
+      priority: device.priority || 0,
+      survey: device.survey || {
+        frequency: "daily",
+        hoursPerDay: 0,
+        usageTimes: [],
+        room: device.room || "Unassigned",
+      },
+    }));
+
+    try {
+      // Save to backend JSON
+      const { updateUserProfile } = await import("../utils/dataBrain");
+      await updateUserProfile({
+        energyCosts: energyData,
+        devices: devicesData,
+      });
+
+      // Navigate to about user page
+      navigate("/about-user");
+    } catch (error) {
+      console.error("Failed to save energy data:", error);
+      alert("Failed to save data. Please try again.");
+    }
   };
 
   const isFormValid = monthlyCost && pricePerKwh && selectedDevices.length > 0;
@@ -399,7 +426,7 @@ export default function EnergyCostSetup() {
 
         {selectedDevices.length > 0 && (
           <motion.button
-            onClick={handleProceedToDashboard}
+            onClick={handleProceed}
             disabled={!isFormValid}
             className="w-full py-3.5 bg-black text-white rounded-full text-sm tracking-wide hover:bg-black/90 transition-colors disabled:cursor-not-allowed"
             initial={{ opacity: 0, y: 20 }}
