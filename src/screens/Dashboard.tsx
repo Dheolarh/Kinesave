@@ -4,7 +4,9 @@ import BottomNav from "../components/BottomNav";
 import FloatingAIRing from "../components/FloatingAIRing";
 import AddDeviceModal from "../components/AddDeviceModal";
 import { getCurrentUserId, getCurrentUserProfile, updateUserProfile } from "../utils/storage";
-import { Plus, Wind, Droplets, Flame, Fan, CloudSun, Tv, Zap, X } from "lucide-react";
+import { searchLocation, getWeatherData } from "../utils/location";
+import type { LocationSearchResult, LocationData } from "../utils/location";
+import { Plus, Wind, Droplets, Flame, Fan, CloudSun, Tv, Zap, X, MapPin } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
 const iconMap = {
@@ -30,8 +32,13 @@ export default function Dashboard() {
   // Long press and delete states
   const [longPressDevice, setLongPressDevice] = useState<any>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showLocationModal, setShowLocationModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [locationSearchQuery, setLocationSearchQuery] = useState("");
+  const [locationSearchResults, setLocationSearchResults] = useState<LocationSearchResult[]>([]);
+  const [isUpdatingLocation, setIsUpdatingLocation] = useState(false);
   const longPressTimer = useRef<NodeJS.Timeout | null>(null);
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // User ID state for double-tap reveal
   const [showUserId, setShowUserId] = useState(false);
@@ -147,6 +154,69 @@ export default function Dashboard() {
     }
   };
 
+  // Location search with debouncing
+  useEffect(() => {
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    if (locationSearchQuery.length < 2) {
+      setLocationSearchResults([]);
+      return;
+    }
+
+    searchTimeoutRef.current = setTimeout(async () => {
+      try {
+        const results = await searchLocation(locationSearchQuery);
+        setLocationSearchResults(results);
+      } catch (error) {
+        console.error("Location search error:", error);
+        setLocationSearchResults([]);
+      }
+    }, 500);
+
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [locationSearchQuery]);
+
+  // Handle location selection
+  const handleLocationSelect = async (result: LocationSearchResult) => {
+    try {
+      setIsUpdatingLocation(true);
+
+      // Fetch weather data for selected location
+      const weatherData = await getWeatherData(result.lat, result.lon);
+
+      const newLocationData = {
+        city: result.city,
+        region: result.region,
+        country: result.country,
+        latitude: result.lat,
+        longitude: result.lon,
+        temperature: weatherData.temperature,
+        weatherDescription: weatherData.weatherDescription,
+      };
+
+      // Update location in localStorage
+      updateUserProfile({ location: newLocationData });
+
+      // Update local state
+      setLocation(newLocationData);
+
+      // Close modal and reset
+      setShowLocationModal(false);
+      setLocationSearchQuery("");
+      setLocationSearchResults([]);
+      setIsUpdatingLocation(false);
+    } catch (error) {
+      console.error("Failed to update location:", error);
+      setIsUpdatingLocation(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 pb-20 overflow-y-auto scrollbar-hide">
       <div className="px-5 pt-4 pb-6">
@@ -157,16 +227,24 @@ export default function Dashboard() {
         >
           {/* Header */}
           <div className="px-3 pt-2 pb-4">
-            <h1
-              className="text-2xl mb-2 tracking-tight font-semibold cursor-pointer select-none"
-              onDoubleClick={() => setShowUserId(!showUserId)}
-            >
-              {showUserId ? (
-                <span className="font-mono text-base">{userId}</span>
-              ) : (
-                "My Devices"
-              )}
-            </h1>
+            <div className="flex items-center justify-between mb-2">
+              <h1
+                className="text-2xl tracking-tight cursor-pointer select-none"
+                onDoubleClick={() => setShowUserId(!showUserId)}
+              >
+                {showUserId ? (
+                  <span className="font-mono text-base">{userId}</span>
+                ) : (
+                  "My Devices"
+                )}
+              </h1>
+              <button
+                onClick={() => setShowLocationModal(true)}
+                className="w-10 h-10 rounded-full border border-black/10 flex items-center justify-center hover:border-black/20 transition-colors"
+              >
+                <MapPin className="w-5 h-5" strokeWidth={1.5} />
+              </button>
+            </div>
             <div className="flex items-center justify-between text-sm text-black/60">
               <div>{location?.city || 'Location'}, {location?.region || 'Unknown'}</div>
               <div className="flex items-center gap-2">
@@ -240,8 +318,7 @@ export default function Dashboard() {
                 transition={{ delay: 0.2 + (index + 1) * 0.05 }}
               >
                 <div
-                  className={`absolute top-3 right-3 w-2 h-2 rounded-full ${device.status === "active" ? "bg-green-500" : "bg-black/20"
-                    }`}
+                  className={`absolute top-3 right-3 w-2 h-2 rounded-full ${device.status === "active" ? "bg-green-500" : "bg-black/20"}`}
                 />
                 <div className="w-12 h-12 bg-white/50 backdrop-blur-sm border border-white/60 rounded-2xl flex items-center justify-center">
                   <Icon className="w-6 h-6" strokeWidth={1.5} />
@@ -262,6 +339,120 @@ export default function Dashboard() {
         onClose={() => setShowAddModal(false)}
         onAdd={handleAddDevice}
       />
+
+      {/* Location Update Modal */}
+      <AnimatePresence>
+        {showLocationModal && (
+          <>
+            <motion.div
+              className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => {
+                setShowLocationModal(false);
+                setLocationSearchQuery("");
+                setLocationSearchResults([]);
+              }}
+            />
+            <motion.div
+              className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-2xl rounded-t-3xl z-50 border-t border-white/60 shadow-[0_-10px_40px_rgba(0,0,0,0.1)] flex flex-col"
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 30, stiffness: 300 }}
+              style={{ maxHeight: "75vh" }}
+            >
+              {/* Header */}
+              <div className="px-6 pt-6 pb-4 flex-shrink-0 flex items-center justify-between">
+                <h2 className="text-xl tracking-tight">Update Location</h2>
+                <button
+                  onClick={() => {
+                    setShowLocationModal(false);
+                    setLocationSearchQuery("");
+                    setLocationSearchResults([]);
+                  }}
+                  className="w-8 h-8 rounded-full border border-black/10 flex items-center justify-center hover:border-black/20 transition-colors"
+                >
+                  <X className="w-4 h-4" strokeWidth={1.5} />
+                </button>
+              </div>
+
+              {/* Content */}
+              <div className="px-6 pb-6 flex-1 overflow-y-auto scrollbar-hide">
+                <div className="space-y-4">
+                  <p className="text-sm text-black/60">
+                    Search for your city to update location
+                  </p>
+
+                  {/* Current Location Display */}
+                  {location && (
+                    <div className="bg-white/50 backdrop-blur-xl border border-white/60 rounded-2xl p-4 shadow-lg">
+                      <div className="text-xs text-black/60 mb-1">Current Location</div>
+                      <div className="text-sm font-medium">
+                        {location.city}, {location.region}
+                      </div>
+                      <div className="text-xs text-black/60 mt-1">
+                        {location.country} • {location.temperature}°C • {location.weatherDescription}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Search Input */}
+                  <div>
+                    <label className="block text-xs text-black/60 mb-2 tracking-wide">
+                      Search City
+                    </label>
+                    <input
+                      type="text"
+                      value={locationSearchQuery}
+                      onChange={(e) => setLocationSearchQuery(e.target.value)}
+                      placeholder="e.g., Lagos, London, New York"
+                      className="w-full px-4 py-3 bg-white/50 backdrop-blur-sm border border-white/60 rounded-xl text-sm shadow-lg focus:outline-none focus:border-black/30"
+                    />
+                  </div>
+
+                  {/* Search Results */}
+                  {locationSearchResults.length > 0 && (
+                    <div className="space-y-2">
+                      <div className="text-xs text-black/60">Select Location:</div>
+                      {locationSearchResults.map((result, index) => (
+                        <button
+                          key={index}
+                          onClick={() => handleLocationSelect(result)}
+                          disabled={isUpdatingLocation}
+                          className="w-full text-left p-4 bg-white/40 backdrop-blur-xl border border-white/60 rounded-2xl shadow-lg hover:bg-white/50 transition-all disabled:opacity-50"
+                        >
+                          <div className="text-sm font-medium">{result.displayName}</div>
+                          <div className="text-xs text-black/60 mt-1">
+                            {result.city}, {result.region} • {result.country}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {isUpdatingLocation && (
+                    <div className="flex items-center justify-center py-8">
+                      <motion.div
+                        className="w-8 h-8 border-2 border-black/20 border-t-black rounded-full"
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                      />
+                    </div>
+                  )}
+
+                  <div className="text-center">
+                    <p className="text-xs text-black/40">
+                      We'll use your location to provide accurate energy pricing and weather data
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
       {/* Delete Confirmation Modal */}
       <AnimatePresence>
