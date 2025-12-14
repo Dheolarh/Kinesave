@@ -56,10 +56,30 @@ export default function AIAnalysis() {
     }
   };
 
-  const startAnalysis = () => {
+  const [error, setError] = useState<string | null>(null);
+
+  const startAnalysis = async () => {
     if (selectedDevices.length > 0) {
       setStage("analyzing");
       setCurrentStep(0);
+      setError(null); // Clear previous errors
+
+      try {
+        // Import AI service dynamically
+        const { default: aiPlanService } = await import('../services/ai-plan.service');
+
+        // Call AI service to generate plans
+        const plans = await aiPlanService.generatePlans(selectedDevices);
+
+        // Save to localStorage
+        localStorage.setItem('aiGeneratedPlans', JSON.stringify(plans));
+
+        setStage("complete");
+      } catch (err: any) {
+        console.error('AI analysis failed:', err);
+        setError(err.message || 'Failed to generate plans. Please try again.');
+        setStage("selection");
+      }
     }
   };
 
@@ -67,13 +87,8 @@ export default function AIAnalysis() {
     if (stage === "analyzing" && currentStep < analysisSteps.length) {
       const timer = setTimeout(() => {
         setCurrentStep(currentStep + 1);
-      }, 2000); // Increased to 2 seconds per step
+      }, 2000); // 2 seconds per progress step
       return () => clearTimeout(timer);
-    } else if (stage === "analyzing" && currentStep >= analysisSteps.length) {
-      const completeTimer = setTimeout(() => {
-        setStage("complete");
-      }, 1000);
-      return () => clearTimeout(completeTimer);
     }
   }, [stage, currentStep]);
 
@@ -107,6 +122,17 @@ export default function AIAnalysis() {
               Choose which devices to include in analysis
             </p>
           </motion.div>
+
+          {/* Error Alert */}
+          {error && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mt-4 bg-red-50 border border-red-200 rounded-2xl p-4"
+            >
+              <p className="text-sm text-red-600">{error}</p>
+            </motion.div>
+          )}
         </div>
 
         <div className="px-5 space-y-3">

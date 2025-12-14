@@ -1,37 +1,77 @@
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { motion } from "motion/react";
 import { TrendingDown, Leaf, Gauge } from "lucide-react";
 import BottomNav from "../components/BottomNav";
+import type { AIPlan } from "../types/ai-plan.types";
 
-const plans = [
-  {
-    id: "1",
-    name: "Cost Saver",
-    description: "Minimize energy bills with optimized schedules",
-    savings: "$28.50",
-    efficiency: "18%",
-    icon: TrendingDown,
-  },
-  {
-    id: "2",
-    name: "Eco Mode",
-    description: "Reduce environmental impact while staying comfortable",
-    savings: "$22.30",
-    efficiency: "24%",
-    icon: Leaf,
-  },
-  {
-    id: "3",
-    name: "Comfort Balance",
-    description: "Perfect balance between cost and comfort",
-    savings: "$18.00",
-    efficiency: "12%",
-    icon: Gauge,
-  },
-];
+const iconMap = {
+  cost: TrendingDown,
+  eco: Leaf,
+  balance: Gauge,
+};
 
 export default function Plans() {
   const navigate = useNavigate();
+  const [plans, setPlans] = useState<AIPlan[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Load AI-generated plans from localStorage
+  useEffect(() => {
+    const loadPlans = () => {
+      try {
+        const savedPlans = localStorage.getItem('aiGeneratedPlans');
+        if (savedPlans) {
+          const plansData = JSON.parse(savedPlans);
+          setPlans([
+            plansData.costSaver,
+            plansData.ecoMode,
+            plansData.comfortBalance,
+          ]);
+        } else {
+          setError('No plans generated yet. Please run analysis from the dashboard.');
+        }
+      } catch (err) {
+        console.error('Failed to load plans:', err);
+        setError('Failed to load plans. Please try running analysis again.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadPlans();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block w-8 h-8 border-2 border-black/20 border-t-black rounded-full animate-spin mb-4" />
+          <p className="text-sm text-black/60">Loading plans...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 pb-20">
+        <div className="px-5 pt-8">
+          <h1 className="text-3xl mb-4 tracking-tight">Recommended Plans</h1>
+          <div className="bg-orange-50 border border-orange-200 rounded-2xl p-6">
+            <p className="text-sm text-orange-600">{error}</p>
+            <button
+              onClick={() => navigate('/ai-analysis')}
+              className="mt-4 px-6 py-2 bg-black text-white rounded-full text-sm"
+            >
+              Run Analysis
+            </button>
+          </div>
+        </div>
+        <BottomNav active="plans" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 pb-20 overflow-y-auto scrollbar-hide">
@@ -49,40 +89,83 @@ export default function Plans() {
       </div>
 
       <div className="px-5 space-y-4">
-        {plans.map((plan, index) => (
-          <motion.button
-            key={plan.id}
-            onClick={() => navigate(`/plan/${plan.id}`)}
-            className="w-full bg-white/40 backdrop-blur-xl border border-white/60 rounded-3xl p-6 text-left hover:bg-white/50 transition-all shadow-lg"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.1 }}
-            whileTap={{ scale: 0.98 }}
-          >
-            <div className="flex items-start gap-4 mb-4">
-              <div className="w-12 h-12 bg-white/50 backdrop-blur-sm border border-white/60 rounded-2xl flex items-center justify-center flex-shrink-0">
-                <plan.icon className="w-5 h-5" strokeWidth={1.5} />
-              </div>
-              <div className="flex-1">
-                <h3 className="text-lg mb-1 tracking-tight">{plan.name}</h3>
-                <p className="text-xs text-black/60 leading-relaxed">
-                  {plan.description}
-                </p>
-              </div>
-            </div>
+        {plans.map((plan, index) => {
+          const Icon = iconMap[plan.type as keyof typeof iconMap] || TrendingDown;
 
-            <div className="flex items-center gap-6 pt-4 border-t border-white/40">
-              <div>
-                <div className="text-xs text-black/50 mb-1">Monthly Savings</div>
-                <div className="text-sm">{plan.savings}</div>
+          return (
+            <motion.button
+              key={plan.id}
+              onClick={() => navigate(`/plan/${index + 1}`)}
+              className="w-full bg-white/40 backdrop-blur-xl border border-white/60 rounded-3xl p-6 text-left hover:bg-white/50 transition-all shadow-lg"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.1 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              <div className="flex items-start gap-4 mb-4">
+                <div className="w-12 h-12 bg-white/50 backdrop-blur-sm border border-white/60 rounded-2xl flex items-center justify-center flex-shrink-0">
+                  <Icon className="w-6 h-6" strokeWidth={1.5} />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg tracking-wide mb-1">{plan.name}</h3>
+                  <p className="text-xs text-black/60 leading-relaxed">
+                    {plan.description}
+                  </p>
+                </div>
               </div>
-              <div>
-                <div className="text-xs text-black/50 mb-1">Efficiency Gain</div>
-                <div className="text-sm">+{plan.efficiency}</div>
+
+              <div className="flex gap-6">
+                {/* Cost Saver Metrics */}
+                {plan.type === 'cost' && (
+                  <>
+                    <div>
+                      <p className="text-xs text-black/50 mb-1">Initial Budget</p>
+                      <p className="text-lg tracking-tight">${plan.metrics.initialBudget || 0}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-black/50 mb-1">Optimized Budget</p>
+                      <p className="text-lg tracking-tight text-green-600">
+                        ${plan.metrics.optimizedBudget || 0}
+                      </p>
+                    </div>
+                  </>
+                )}
+
+                {/* Eco Mode Metrics */}
+                {plan.type === 'eco' && (
+                  <>
+                    <div>
+                      <p className="text-xs text-black/50 mb-1">Initial Eco Score</p>
+                      <p className="text-lg tracking-tight">{plan.metrics.initialEcoScore || 0}/100</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-black/50 mb-1">Optimized Eco Score</p>
+                      <p className="text-lg tracking-tight text-green-600">
+                        {plan.metrics.optimizedEcoScore || 0}/100
+                      </p>
+                    </div>
+                  </>
+                )}
+
+                {/* Comfort Balance Metrics */}
+                {plan.type === 'balance' && (
+                  <>
+                    <div>
+                      <p className="text-xs text-black/50 mb-1">Optimized Budget</p>
+                      <p className="text-lg tracking-tight">${plan.metrics.optimizedBudget || 0}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-black/50 mb-1">Eco Friendly Gain</p>
+                      <p className="text-lg tracking-tight text-green-600">
+                        +{plan.metrics.ecoFriendlyGainPercentage || 0}%
+                      </p>
+                    </div>
+                  </>
+                )}
               </div>
-            </div>
-          </motion.button>
-        ))}
+            </motion.button>
+          );
+        })}
       </div>
 
       <BottomNav active="plans" />

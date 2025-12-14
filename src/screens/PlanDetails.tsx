@@ -4,6 +4,7 @@ import { ArrowLeft, TrendingDown, Wind, Droplets, Bell, CloudRain, Sun, Cloud, X
 import { motion, AnimatePresence } from "motion/react";
 import { Calendar } from "../components/ui/calendar";
 import BottomNav from "../components/BottomNav";
+import notificationService from "../services/notification.service";
 
 const planData = {
     "1": {
@@ -104,7 +105,7 @@ export default function PlanDetails() {
         return null;
     }
 
-    const handleSelect = () => {
+    const handleSelect = async () => {
         setSelected(true);
         setShowNotification(true);
 
@@ -114,8 +115,17 @@ export default function PlanDetails() {
             name: plan.name,
             savings: plan.savings,
             status: "active",
+            type: id === "1" ? "cost" : id === "2" ? "eco" : "balance",
         };
         localStorage.setItem("activePlan", JSON.stringify(activePlan));
+
+        // Send plan activation notification
+        const savingsAmount = parseFloat(plan.savings.replace('$', ''));
+        await notificationService.sendPlanSelectedNotification(
+            plan.name,
+            activePlan.type as 'cost' | 'eco' | 'balance',
+            savingsAmount
+        );
 
         setTimeout(() => {
             setShowNotification(false);

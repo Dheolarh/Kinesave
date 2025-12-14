@@ -614,7 +614,7 @@ class DeviceSpecsService {
             );
         }
 
-        console.log(`✅ Found ${devices.length} device(s)`);
+        console.log(`Found ${devices.length} device(s)`);
 
         return devices;
     }
@@ -629,4 +629,4 @@ class DeviceSpecsService {
 }
 
 export default new DeviceSpecsService();
-export { DeviceSpec, SearchQuery };
+export type { DeviceSpec, SearchQuery };

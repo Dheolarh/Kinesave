@@ -6,8 +6,10 @@ import AddDeviceModal from "../components/AddDeviceModal";
 import { getCurrentUserId, getCurrentUserProfile, updateUserProfile } from "../utils/storage";
 import { searchLocation, getWeatherData } from "../utils/location";
 import type { LocationSearchResult, LocationData } from "../utils/location";
-import { Plus, Wind, Droplets, Flame, Fan, CloudSun, Tv, Zap, X, MapPin } from "lucide-react";
+import { Plus, Wind, Droplets, Flame, Fan, CloudSun, Tv, Zap, X, MapPin, Bell } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
+import NotificationCenter from "../components/NotificationCenter";
+import notificationService from "../services/notification.service";
 
 const iconMap = {
   ac: Wind,
@@ -33,6 +35,8 @@ export default function Dashboard() {
   const [longPressDevice, setLongPressDevice] = useState<any>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showLocationModal, setShowLocationModal] = useState(false);
+  const [showNotificationCenter, setShowNotificationCenter] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [isDeleting, setIsDeleting] = useState(false);
   const [locationSearchQuery, setLocationSearchQuery] = useState("");
   const [locationSearchResults, setLocationSearchResults] = useState<LocationSearchResult[]>([]);
@@ -50,7 +54,18 @@ export default function Dashboard() {
     // Load userId from localStorage
     const storedUserId = getCurrentUserId() || "";
     setUserId(storedUserId);
+    // Load notification count
+    loadUnreadCount();
   }, []);
+
+  const loadUnreadCount = () => {
+    setUnreadCount(notificationService.getUnreadCount());
+  };
+
+  const handleNotificationCenterClose = () => {
+    setShowNotificationCenter(false);
+    loadUnreadCount(); // Refresh count when closing
+  };
 
   const loadData = () => {
     try {
@@ -229,24 +244,36 @@ export default function Dashboard() {
           <div className="px-3 pt-2 pb-4">
             <div className="flex items-center justify-between mb-2">
               <h1
-                className="text-2xl tracking-tight cursor-pointer select-none"
+                className="text-2xl tracking-tight flex-shrink-0"
                 onDoubleClick={() => setShowUserId(!showUserId)}
               >
                 {showUserId ? (
-                  <span className="font-mono text-base">{userId}</span>
+                  <div className="font-mono text-base overflow-x-auto max-w-[8rem] whitespace-nowrap">{userId}</div>
                 ) : (
                   "My Devices"
                 )}
               </h1>
+              {/* Notification Bell */}
               <button
-                onClick={() => setShowLocationModal(true)}
-                className="w-10 h-10 rounded-full border border-black/10 flex items-center justify-center hover:border-black/20 transition-colors"
+                onClick={() => setShowNotificationCenter(true)}
+                className="relative w-10 h-10 flex items-center justify-center"
               >
-                <MapPin className="w-5 h-5" strokeWidth={1.5} />
+                <Bell className="w-5 h-5" strokeWidth={1.5} />
+                {/* Unread indicator dot */}
+                {unreadCount > 0 && (
+                  <div className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-black rounded-full" />
+                )}
               </button>
             </div>
             <div className="flex items-center justify-between text-sm text-black/60">
-              <div>{location?.city || 'Location'}, {location?.region || 'Unknown'}</div>
+              {/* Clickable location */}
+              <button
+                onClick={() => setShowLocationModal(true)}
+                className="hover:text-black transition-colors flex items-center gap-1.5"
+              >
+                <MapPin className="w-4 h-4" strokeWidth={1.5} />
+                <span>{location?.city || 'Location'}, {location?.region || 'Unknown'}</span>
+              </button>
               <div className="flex items-center gap-2">
                 <span>{location?.temperature || '—'}°C • {location?.weatherDescription || '—'}</span>
                 <CloudSun className="w-4 h-4" strokeWidth={1.5} />
@@ -333,6 +360,12 @@ export default function Dashboard() {
       </div>
 
       <FloatingAIRing onClick={() => navigate("/ai-analysis")} />
+      {/* Notification Center Modal */}
+      <NotificationCenter
+        isOpen={showNotificationCenter}
+        onClose={handleNotificationCenterClose}
+      />
+
       <BottomNav active="home" />
       <AddDeviceModal
         isOpen={showAddModal}
