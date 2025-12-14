@@ -1,95 +1,11 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router";
-import { ArrowLeft, TrendingDown, Wind, Droplets, Bell, CloudRain, Sun, Cloud, X, Tv, Lightbulb } from "lucide-react";
+import { ArrowLeft, TrendingDown, Wind, Droplets, Bell, Sun, X, Tv, Lightbulb } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { Calendar } from "../components/ui/calendar";
 import BottomNav from "../components/BottomNav";
 import notificationService from "../services/notification.service";
-
-const planData = {
-    "1": {
-        name: "Cost Saver",
-        description: "Minimize energy bills with optimized schedules",
-        savings: "$28.50",
-        efficiency: "18%",
-        devices: ["Living Room AC", "Bedroom Dehumidifier"],
-        schedule: "Peak hours: AC off, Dehumidifier on low. Off-peak: Normal operation.",
-        alerts: [
-            "AC exceeds 6 hours daily usage",
-            "Temperature drops below 72°F",
-            "Dehumidifier runs more than 10 hours",
-        ],
-    },
-    "2": {
-        name: "Eco Mode",
-        description: "Reduce environmental impact while staying comfortable",
-        savings: "$22.30",
-        efficiency: "24%",
-        devices: ["Living Room AC", "Bedroom Dehumidifier"],
-        schedule: "Eco-friendly settings prioritizing renewable energy hours.",
-        alerts: [
-            "High energy consumption detected",
-            "Better weather conditions available",
-            "Device running during peak carbon hours",
-        ],
-    },
-    "3": {
-        name: "Comfort Balance",
-        description: "Perfect balance between cost and comfort",
-        savings: "$18.00",
-        efficiency: "12%",
-        devices: ["Living Room AC"],
-        schedule: "Optimized temperature settings based on occupancy patterns.",
-        alerts: [
-            "Room unoccupied for 2+ hours",
-            "Temperature deviation detected",
-            "Suggested schedule adjustment available",
-        ],
-    },
-};
-
-// Mock data for daily device usage
-const generateDailyUsage = (date: Date, planId: string) => {
-    const dayOfMonth = date.getDate();
-    const weatherConditions = ['Sunny', 'Partly Cloudy', 'Rainy', 'Cloudy'];
-    const weatherIcons = { 'Sunny': Sun, 'Partly Cloudy': Cloud, 'Rainy': CloudRain, 'Cloudy': Cloud };
-    const weather = weatherConditions[dayOfMonth % 4];
-
-    const devices = planId === "1"
-        ? [
-            { name: "Living Room AC", priority: "High", useTime: weather === 'Sunny' ? "8.5 hrs" : weather === 'Rainy' ? "2.0 hrs" : "5.5 hrs" },
-            { name: "Bedroom Dehumidifier", priority: "Medium", useTime: weather === 'Rainy' ? "12.0 hrs" : weather === 'Sunny' ? "3.0 hrs" : "7.0 hrs" },
-            { name: "Smart TV", priority: "Low", useTime: weather === 'Sunny' ? "4.0 hrs" : weather === 'Rainy' ? "6.5 hrs" : "5.0 hrs" },
-            { name: "LED Lighting", priority: "Medium", useTime: weather === 'Sunny' ? "2.5 hrs" : weather === 'Rainy' ? "8.0 hrs" : "5.5 hrs" },
-        ]
-        : planId === "2"
-            ? [
-                { name: "Living Room AC", priority: "Medium", useTime: weather === 'Sunny' ? "6.0 hrs" : weather === 'Rainy' ? "1.5 hrs" : "4.0 hrs" },
-                { name: "Bedroom Dehumidifier", priority: "High", useTime: weather === 'Rainy' ? "10.0 hrs" : weather === 'Sunny' ? "4.0 hrs" : "8.0 hrs" },
-                { name: "Smart TV", priority: "Low", useTime: weather === 'Sunny' ? "3.5 hrs" : weather === 'Rainy' ? "7.0 hrs" : "4.5 hrs" },
-                { name: "LED Lighting", priority: "Low", useTime: weather === 'Sunny' ? "2.0 hrs" : weather === 'Rainy' ? "7.5 hrs" : "5.0 hrs" },
-            ]
-            : [
-                { name: "Living Room AC", priority: "High", useTime: weather === 'Sunny' ? "10.0 hrs" : weather === 'Rainy' ? "3.0 hrs" : "7.0 hrs" },
-                { name: "Bedroom Dehumidifier", priority: "Medium", useTime: weather === 'Rainy' ? "11.0 hrs" : weather === 'Sunny' ? "3.5 hrs" : "7.5 hrs" },
-                { name: "Smart TV", priority: "Medium", useTime: weather === 'Sunny' ? "4.5 hrs" : weather === 'Rainy' ? "6.0 hrs" : "5.0 hrs" },
-                { name: "LED Lighting", priority: "High", useTime: weather === 'Sunny' ? "3.0 hrs" : weather === 'Rainy' ? "8.5 hrs" : "6.0 hrs" },
-            ];
-
-    const totalHours = devices.reduce((sum, d) => sum + parseFloat(d.useTime), 0);
-    const estimatedCost = (totalHours * 0.15).toFixed(2);
-
-    return {
-        weather,
-        weatherIcon: weatherIcons[weather as keyof typeof weatherIcons],
-        devices,
-        summary: {
-            totalHours: totalHours.toFixed(1),
-            estimatedCost: `$${estimatedCost}`,
-            peakUsage: weather === 'Sunny' ? "2pm - 6pm" : weather === 'Rainy' ? "All day" : "12pm - 4pm",
-        }
-    };
-};
+import type { AIPlan } from "../types/ai-plan.types";
 
 export default function PlanDetails() {
     const { id } = useParams();
@@ -98,38 +14,156 @@ export default function PlanDetails() {
     const [showNotification, setShowNotification] = useState(false);
     const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
     const [showModal, setShowModal] = useState(false);
+    const [plan, setPlan] = useState<AIPlan | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [deviceNames, setDeviceNames] = useState<Record<string, any>>({});
 
-    const plan = planData[id as keyof typeof planData];
+    // Load AI plan and device names from localStorage
+    useEffect(() => {
+        const loadPlan = () => {
+            try {
+                const savedPlans = localStorage.getItem('aiGeneratedPlans');
+                if (!savedPlans) {
+                    navigate('/ai-analysis');
+                    return;
+                }
 
-    if (!plan) {
-        return null;
+                const plansData = JSON.parse(savedPlans);
+                let selectedPlan: AIPlan | null = null;
+
+                // Map ID to plan type
+                if (id === '1') selectedPlan = plansData.costSaver;
+                else if (id === '2') selectedPlan = plansData.ecoMode;
+                else if (id === '3') selectedPlan = plansData.comfortBalance;
+
+                if (!selectedPlan) {
+                    navigate('/plans');
+                    return;
+                }
+
+                setPlan(selectedPlan);
+
+                // Load device names
+                const profileStr = localStorage.getItem('userEnergyProfile');
+                if (profileStr) {
+                    const profile = JSON.parse(profileStr);
+                    const devicesMap: Record<string, any> = {};
+                    profile.devices?.forEach((device: any) => {
+                        devicesMap[device.id] = device;
+                    });
+                    setDeviceNames(devicesMap);
+                }
+            } catch (error) {
+                console.error('Failed to load plan:', error);
+                navigate('/plans');
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        loadPlan();
+    }, [id, navigate]);
+
+    // Get metrics display based on plan type
+    const getMetricsDisplay = () => {
+        if (!plan) return { label1: "", value1: "$0", label2: "", value2: "0%" };
+
+        const metrics = plan.metrics as any;
+
+        if (plan.type === 'cost') {
+            return {
+                label1: "Monthly Savings",
+                value1: `$${metrics.monthlySaving || 0}`,
+                label2: "Efficiency Gain",
+                value2: `${Math.round((metrics.monthlySaving / (metrics.initialBudget || 1)) * 100)}%`
+            };
+        } else if (plan.type === 'eco') {
+            return {
+                label1: "Eco Friendly",
+                value1: `+${metrics.ecoImprovementPercentage || 0}%`,
+                label2: "Monthly Cost Cap",
+                value2: `$${metrics.monthlyCostCap || 0}`
+            };
+        } else {
+            return {
+                label1: "Budget Reduction",
+                value1: `${metrics.budgetReductionPercentage || 0}%`,
+                label2: "Eco Gain",
+                value2: `+${metrics.ecoFriendlyGainPercentage || 0}%`
+            };
+        }
+    };
+
+    // Find daily schedule for selected date
+    const getDailySchedule = () => {
+        if (!selectedDate || !plan?.dailySchedules) return null;
+
+        const dateStr = selectedDate.toISOString().split('T')[0];
+        return plan.dailySchedules.find((s: any) => s.date?.startsWith(dateStr));
+    };
+
+    const dailySchedule = getDailySchedule();
+
+    // Lock body scroll when modal is open - MUST be before any conditional returns
+    useEffect(() => {
+        if (showModal) {
+            document.body.style.overflow = 'hidden';
+        } else {
+            document.body.style.overflow = 'unset';
+        }
+
+        return () => {
+            document.body.style.overflow = 'unset';
+        };
+    }, [showModal]);
+
+    if (loading || !plan) {
+        return (
+            <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
+                <div className="text-center">
+                    <div className="inline-block w-8 h-8 border-2 border-black/20 border-t-black rounded-full animate-spin mb-4" />
+                    <p className="text-sm text-black/60">Loading plan...</p>
+                </div>
+            </div>
+        );
     }
+
+    const metricsDisplay = getMetricsDisplay();
 
     const handleSelect = async () => {
         setSelected(true);
         setShowNotification(true);
 
+        // Calculate savings from metrics
+        let savings = 0;
+        const metrics = plan.metrics as any;
+        if (plan.type === 'cost') {
+            savings = metrics.monthlySaving || 0;
+        } else if (plan.type === 'eco') {
+            savings = metrics.ecoImprovementPercentage || 0;
+        } else {
+            savings = metrics.budgetReductionPercentage || 0;
+        }
+
         // Save active plan to localStorage
         const activePlan = {
             id,
             name: plan.name,
-            savings: plan.savings,
+            savings: `$${savings.toFixed(2)}`,
             status: "active",
-            type: id === "1" ? "cost" : id === "2" ? "eco" : "balance",
+            type: plan.type,
         };
         localStorage.setItem("activePlan", JSON.stringify(activePlan));
 
         // Send plan activation notification
-        const savingsAmount = parseFloat(plan.savings.replace('$', ''));
         await notificationService.sendPlanSelectedNotification(
             plan.name,
-            activePlan.type as 'cost' | 'eco' | 'balance',
-            savingsAmount
+            plan.type,
+            savings
         );
 
         setTimeout(() => {
             setShowNotification(false);
-            // Navigate back to dashboard after activation
             setTimeout(() => {
                 navigate("/dashboard");
             }, 500);
@@ -142,22 +176,6 @@ export default function PlanDetails() {
             setShowModal(true);
         }
     };
-
-    const dailyUsage = selectedDate ? generateDailyUsage(selectedDate, id || "1") : null;
-    const WeatherIcon = dailyUsage?.weatherIcon || Sun;
-
-    // Lock body scroll when modal is open
-    useEffect(() => {
-        if (showModal) {
-            document.body.style.overflow = 'hidden';
-        } else {
-            document.body.style.overflow = 'unset';
-        }
-
-        return () => {
-            document.body.style.overflow = 'unset';
-        };
-    }, [showModal]);
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 pb-20 overflow-y-auto scrollbar-hide">
@@ -196,7 +214,11 @@ export default function PlanDetails() {
                     <div className="flex-1">
                         <h1 className="text-2xl mb-2 tracking-tight">{plan.name}</h1>
                         <p className="text-sm text-black/60 leading-relaxed">
-                            {plan.description}
+                            {plan.type === 'cost'
+                                ? 'Minimize energy bills with optimized schedules'
+                                : plan.type === 'eco'
+                                    ? 'Reduce environmental impact while staying comfortable'
+                                    : 'Perfect balance between cost and comfort'}
                         </p>
                     </div>
                 </div>
@@ -210,8 +232,8 @@ export default function PlanDetails() {
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.1 }}
                     >
-                        <div className="text-2xl mb-1">{plan.savings}</div>
-                        <div className="text-xs text-black/50">Monthly Savings</div>
+                        <div className="text-2xl mb-1">{metricsDisplay.value1}</div>
+                        <div className="text-xs text-black/50">{metricsDisplay.label1}</div>
                     </motion.div>
 
                     <motion.div
@@ -220,32 +242,51 @@ export default function PlanDetails() {
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.15 }}
                     >
-                        <div className="text-2xl mb-1">+{plan.efficiency}</div>
-                        <div className="text-xs text-black/50">Efficiency Gain</div>
+                        <div className="text-2xl mb-1">{metricsDisplay.value2}</div>
+                        <div className="text-xs text-black/50">{metricsDisplay.label2}</div>
                     </motion.div>
                 </div>
 
                 <div>
                     <h2 className="text-xs tracking-wide text-black/60 mb-3">DEVICES INCLUDED</h2>
                     <div className="space-y-2">
-                        {plan.devices.map((device, index) => (
-                            <motion.div
-                                key={index}
-                                className="bg-white/40 backdrop-blur-xl border border-white/60 rounded-2xl p-4 flex items-center gap-3 shadow-lg"
-                                initial={{ opacity: 0, x: -10 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                transition={{ delay: 0.2 + index * 0.05 }}
-                            >
-                                <div className="w-10 h-10 bg-white/50 backdrop-blur-sm border border-white/60 rounded-xl flex items-center justify-center flex-shrink-0">
-                                    {index === 0 ? (
-                                        <Wind className="w-5 h-5" strokeWidth={1.5} />
-                                    ) : (
-                                        <Droplets className="w-5 h-5" strokeWidth={1.5} />
-                                    )}
-                                </div>
-                                <span className="text-sm">{device}</span>
-                            </motion.div>
-                        ))}
+                        {plan.devices && plan.devices.length > 0 ? (
+                            plan.devices.map((deviceId: string, index: number) => (
+                                <motion.div
+                                    key={deviceId}
+                                    className="bg-white/40 backdrop-blur-xl border border-white/60 rounded-2xl p-4 flex items-center gap-3 shadow-lg"
+                                    initial={{ opacity: 0, x: -10 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    transition={{ delay: 0.2 + index * 0.05 }}
+                                >
+                                    <div className="w-10 h-10 bg-white/50 backdrop-blur-sm border border-white/60 rounded-xl flex items-center justify-center flex-shrink-0">
+                                        {deviceId.toLowerCase().includes('tv') ? (
+                                            <Tv className="w-5 h-5" strokeWidth={1.5} />
+                                        ) : deviceId.toLowerCase().includes('light') ? (
+                                            <Lightbulb className="w-5 h-5" strokeWidth={1.5} />
+                                        ) : deviceId.toLowerCase().includes('pump') || deviceId.toLowerCase().includes('water') ? (
+                                            <Droplets className="w-5 h-5" strokeWidth={1.5} />
+                                        ) : (
+                                            <Wind className="w-5 h-5" strokeWidth={1.5} />
+                                        )}
+                                    </div>
+                                    <div className="flex-1">
+                                        <div className="text-sm">
+                                            {(() => {
+                                                const device = deviceNames[deviceId];
+                                                console.log('Device lookup:', deviceId, device, deviceNames);
+                                                return device?.name || deviceId.replace(/_/g, ' ').replace(/^dev\s+/, '');
+                                            })()}
+                                        </div>
+                                        {deviceNames[deviceId]?.wattage && (
+                                            <div className="text-xs text-black/50">{deviceNames[deviceId].wattage}W</div>
+                                        )}
+                                    </div>
+                                </motion.div>
+                            ))
+                        ) : (
+                            <p className="text-sm text-black/50">No devices assigned yet</p>
+                        )}
                     </div>
                 </div>
 
@@ -288,18 +329,24 @@ export default function PlanDetails() {
                 <div>
                     <h2 className="text-xs tracking-wide text-black/60 mb-3">SMART ALERTS</h2>
                     <div className="space-y-2">
-                        {plan.alerts.map((alert, index) => (
-                            <motion.div
-                                key={index}
-                                className="bg-white/40 backdrop-blur-xl border border-white/60 rounded-2xl p-4 flex items-start gap-3 shadow-lg"
-                                initial={{ opacity: 0, x: -10 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                transition={{ delay: 0.35 + index * 0.05 }}
-                            >
-                                <Bell className="w-4 h-4 mt-0.5 flex-shrink-0 text-black/60" strokeWidth={1.5} />
-                                <span className="text-sm leading-relaxed">{alert}</span>
-                            </motion.div>
-                        ))}
+                        {plan.smartAlerts && plan.smartAlerts.length > 0 ? (
+                            plan.smartAlerts.slice(0, 3).map((alert: any, index: number) => (
+                                <motion.div
+                                    key={index}
+                                    className="bg-white/40 backdrop-blur-xl border border-white/60 rounded-2xl p-4 flex items-start gap-3 shadow-lg"
+                                    initial={{ opacity: 0, x: -10 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    transition={{ delay: 0.35 + index * 0.05 }}
+                                >
+                                    <Bell className="w-4 h-4 mt-0.5 flex-shrink-0 text-black/60" strokeWidth={1.5} />
+                                    <span className="text-sm leading-relaxed">
+                                        {typeof alert === 'string' ? alert : alert.message || alert.text || JSON.stringify(alert)}
+                                    </span>
+                                </motion.div>
+                            ))
+                        ) : (
+                            <p className="text-sm text-black/50">No alerts configured yet</p>
+                        )}
                     </div>
                 </div>
             </div>
@@ -328,20 +375,24 @@ export default function PlanDetails() {
                             onClick={() => setShowModal(false)}
                         />
                         <motion.div
-                            className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-2xl rounded-t-3xl z-50 border-t border-white/60 shadow-[0_-10px_40px_rgba(0,0,0,0.1)] flex flex-col max-h-[80vh]"
+                            className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-2xl rounded-t-3xl z-50 border-t border-white/60 shadow-[0_-10px_40px_rgba(0,0,0,0.1)] p-6 max-h-[75vh] overflow-y-auto"
                             initial={{ y: "100%" }}
                             animate={{ y: 0 }}
                             exit={{ y: "100%" }}
                             transition={{ type: "spring", damping: 30, stiffness: 300 }}
                         >
-                            <div className="flex items-center justify-between px-6 pt-6 pb-6 flex-shrink-0">
-                                <h2 className="text-xl tracking-tight">
-                                    {selectedDate?.toLocaleDateString('en-US', {
-                                        weekday: 'long',
-                                        month: 'long',
-                                        day: 'numeric'
-                                    })}
-                                </h2>
+                            <div className="flex items-center justify-between mb-4">
+                                <div>
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <Sun className="w-5 h-5" />
+                                        <span className="text-sm font-medium">
+                                            {selectedDate?.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+                                        </span>
+                                    </div>
+                                    <p className="text-xs text-black/50">
+                                        {dailySchedule ? 'AI-Optimized Schedule' : 'No schedule available'}
+                                    </p>
+                                </div>
                                 <button
                                     onClick={() => setShowModal(false)}
                                     className="w-8 h-8 rounded-full border border-black/10 flex items-center justify-center hover:border-black/20 transition-colors"
@@ -350,77 +401,57 @@ export default function PlanDetails() {
                                 </button>
                             </div>
 
-                            <div className="px-6 pb-6 space-y-4 flex-shrink-0">
-                                {/* Weather Info */}
-                                <div className="flex items-center gap-3 bg-white/60 backdrop-blur-xl border border-white/60 rounded-2xl p-4 shadow-lg">
-                                    <div className="w-10 h-10 bg-white/50 backdrop-blur-sm border border-white/60 rounded-xl flex items-center justify-center">
-                                        <WeatherIcon className="w-5 h-5" strokeWidth={1.5} />
-                                    </div>
-                                    <div>
-                                        <div className="text-sm">{dailyUsage?.weather}</div>
-                                        <div className="text-xs text-black/50">Estimated Weather</div>
-                                    </div>
-                                </div>
+                            {dailySchedule ? (
+                                <div className="space-y-3">
+                                    {Object.entries(dailySchedule)
+                                        .filter(([key]) => key !== 'date' && key !== 'day' && key !== 'dayNumber')
+                                        .map(([deviceId, schedule]: [string, any]) => {
+                                            const device = deviceNames[deviceId];
+                                            const usage = typeof schedule === 'number' ? schedule :
+                                                typeof schedule === 'object' && schedule.usage ? schedule.usage :
+                                                    typeof schedule === 'object' && schedule.hours ? schedule.hours : null;
 
-                                {/* Summary Stats */}
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div className="bg-white/60 backdrop-blur-xl border border-white/60 rounded-2xl p-4 shadow-lg">
-                                        <div className="text-xl mb-1">{dailyUsage?.summary.totalHours} hrs</div>
-                                        <div className="text-xs text-black/50">Total Usage</div>
-                                    </div>
-                                    <div className="bg-white/60 backdrop-blur-xl border border-white/60 rounded-2xl p-4 shadow-lg">
-                                        <div className="text-xl mb-1">{dailyUsage?.summary.estimatedCost}</div>
-                                        <div className="text-xs text-black/50">Estimated Cost</div>
-                                    </div>
-                                </div>
-
-                                {/* Peak Usage */}
-                                <div className="bg-white/60 backdrop-blur-xl border border-white/60 rounded-2xl p-4 shadow-lg">
-                                    <div className="text-xs text-black/50 mb-1">Peak Usage Period</div>
-                                    <div className="text-sm">{dailyUsage?.summary.peakUsage}</div>
-                                </div>
-
-                                {/* Devices Section Header */}
-                                <h3 className="text-xs tracking-wide text-black/60">DEVICES & USAGE</h3>
-                            </div>
-
-                            {/* Scrollable Devices List */}
-                            <div className="px-6 pb-6 flex-1 overflow-y-auto scrollbar-hide">
-                                <div className="space-y-2">
-                                    {dailyUsage?.devices.map((device, index) => {
-                                        const getDeviceIcon = () => {
-                                            if (device.name.includes('AC')) return <Wind className="w-5 h-5" strokeWidth={1.5} />;
-                                            if (device.name.includes('Dehumidifier')) return <Droplets className="w-5 h-5" strokeWidth={1.5} />;
-                                            if (device.name.includes('TV')) return <Tv className="w-5 h-5" strokeWidth={1.5} />;
-                                            if (device.name.includes('Lighting')) return <Lightbulb className="w-5 h-5" strokeWidth={1.5} />;
-                                            return <Wind className="w-5 h-5" strokeWidth={1.5} />;
-                                        };
-
-                                        return (
-                                            <div
-                                                key={index}
-                                                className="bg-white/60 backdrop-blur-xl border border-white/60 rounded-2xl p-4 shadow-lg"
-                                            >
-                                                <div className="flex items-center gap-3 mb-2">
-                                                    <div className="w-10 h-10 bg-white/50 backdrop-blur-sm border border-white/60 rounded-xl flex items-center justify-center flex-shrink-0">
-                                                        {getDeviceIcon()}
-                                                    </div>
-                                                    <div className="flex-1">
-                                                        <div className="text-sm mb-0.5">{device.name}</div>
-                                                        <div className="text-xs text-black/50">
-                                                            Priority: <span className={device.priority === 'High' ? 'text-black' : ''}>{device.priority}</span>
+                                            return (
+                                                <div
+                                                    key={deviceId}
+                                                    className="bg-white/60 backdrop-blur-xl border border-white/60 rounded-xl p-4"
+                                                >
+                                                    <div className="flex items-center justify-between">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="w-8 h-8 bg-white/50 rounded-lg flex items-center justify-center">
+                                                                {deviceId.toLowerCase().includes('tv') ? (
+                                                                    <Tv className="w-4 h-4" strokeWidth={1.5} />
+                                                                ) : deviceId.toLowerCase().includes('pump') || deviceId.toLowerCase().includes('water') ? (
+                                                                    <Droplets className="w-4 h-4" strokeWidth={1.5} />
+                                                                ) : (
+                                                                    <Wind className="w-4 h-4" strokeWidth={1.5} />
+                                                                )}
+                                                            </div>
+                                                            <div>
+                                                                <div className="text-sm">{device?.name || deviceId.replace(/_/g, ' ')}</div>
+                                                                {device?.priority && (
+                                                                    <div className="text-xs text-black/50">Priority: {device.priority}</div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                        <div className="text-right">
+                                                            <p className="text-sm font-medium">
+                                                                {usage !== null ? `${usage} hrs` : 'Off'}
+                                                            </p>
+                                                            {schedule.window && (
+                                                                <p className="text-xs text-black/50">{schedule.window}</p>
+                                                            )}
                                                         </div>
                                                     </div>
                                                 </div>
-                                                <div className="flex justify-between items-center pt-2">
-                                                    <span className="text-xs text-black/50">Calculated Use Time</span>
-                                                    <span className="text-sm">{device.useTime}</span>
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
+                                            );
+                                        })}
                                 </div>
-                            </div>
+                            ) : (
+                                <div className="text-center py-8">
+                                    <p className="text-sm text-black/50">No schedule data for this date</p>
+                                </div>
+                            )}
                         </motion.div>
                     </>
                 )}

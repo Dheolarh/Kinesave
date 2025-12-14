@@ -124,13 +124,15 @@ export default function Plans() {
                 {plan.type === 'eco' && (
                   <>
                     <div>
-                      <p className="text-xs text-black/50 mb-1">Initial Eco Score</p>
-                      <p className="text-lg tracking-tight">{plan.metrics.initialEcoScore || 0}/100</p>
+                      <p className="text-xs text-black/50 mb-1">Eco Friendly</p>
+                      <p className="text-lg tracking-tight text-green-600">
+                        +{plan.metrics.ecoImprovementPercentage || 0}%
+                      </p>
                     </div>
                     <div>
-                      <p className="text-xs text-black/50 mb-1">Optimized Eco Score</p>
-                      <p className="text-lg tracking-tight text-green-600">
-                        {plan.metrics.optimizedEcoScore || 0}/100
+                      <p className="text-xs text-black/50 mb-1">Monthly Cost Cap</p>
+                      <p className="text-lg tracking-tight">
+                        ${plan.metrics.monthlyCostCap || 0}
                       </p>
                     </div>
                   </>
@@ -140,8 +142,10 @@ export default function Plans() {
                 {plan.type === 'balance' && (
                   <>
                     <div>
-                      <p className="text-xs text-black/50 mb-1">Optimized Budget</p>
-                      <p className="text-lg tracking-tight">${plan.metrics.optimizedBudget || 0}</p>
+                      <p className="text-xs text-black/50 mb-1">Budget Reduction</p>
+                      <p className="text-lg tracking-tight">
+                        -{plan.metrics.budgetReductionPercentage || 0}%
+                      </p>
                     </div>
                     <div>
                       <p className="text-xs text-black/50 mb-1">Eco Friendly Gain</p>

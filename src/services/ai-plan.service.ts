@@ -161,36 +161,104 @@ Your responses must be valid JSON only. No explanatory text before or after the 
      */
     private buildChunkPrompt(data: AIAnalysisInput, startDay: number, endDay: number): string {
         const deviceList = data.devices.map((d, i) =>
-            `${i + 1}. ${d.name} (${d.type}): ${d.wattage}W, Priority ${d.priority}, ${d.survey.hoursPerDay}hrs/day`
+            `${i + 1}. ID: "${d.id}" - ${d.name} (${d.type}): ${d.wattage}W, Priority ${d.priority}, User typically uses ${d.survey.hoursPerDay}hrs/day`
         ).join('\n');
+
+        const deviceIds = data.devices.map(d => d.id).join(', ');
 
         const weatherChunk = data.weatherForecast.slice(startDay - 1, endDay);
 
-        return `Generate energy plans for days ${startDay}-${endDay} (${endDay - startDay + 1} days).
+        // Format weather data clearly for each day
+        const weatherByDay = weatherChunk.map((w, i) =>
+            `Day ${startDay + i}: ${w.condition}, ${w.avgTemp}°C`
+        ).join('\n');
 
-DEVICES: ${deviceList}
-WEATHER: ${JSON.stringify(weatherChunk)}
-BUDGET: ${data.energyCosts.currencySymbol}${data.energyCosts.preferredBudget || 0}/month (${((data.energyCosts.preferredBudget || 0) / 30).toFixed(2)}/day max)
+        return `You are creating energy optimization plans for days ${startDay}-${endDay}.
 
-Generate 3 plans (costSaver, ecoMode, comfortBalance) with:
+DEVICES TO SCHEDULE (MUST USE EXACT IDs):
+${deviceList}
 
-1. METRICS (calculate for full ${data.analysisDays} days):
-   - costSaver: {"initialBudget": ${data.energyCosts.preferredBudget || 0}, "optimizedBudget": <calculated>, "monthlySaving": <difference>}
-   - ecoMode: {"initialEcoScore": 100, "optimizedEcoScore": <calculated 0-100>, "ecoImprovementPercentage": <improvement>, "monthlyCostCap": ${data.energyCosts.preferredBudget ? data.energyCosts.preferredBudget * 1.5 : 0}}
-   - comfortBalance: {"optimized Budget": <calculated>, "budgetReductionPercentage": <percent>, "ecoFriendlyGainPercentage": <percent>}
+WEATHER FORECAST (USE THIS DATA):
+${weatherByDay}
 
-2. dailySchedules: For days ${startDay}-${endDay}, simple array with date & device hours
-3. dailyTips: dayNumber, 3-5 SHORT tips per day
-4. smartAlerts: 3-5 brief alerts (only in LAST chunk for days 28-30)
+CRITICAL RULES:
+1. Use ONLY these device IDs: ${deviceIds}
+2. DO NOT invent fake device IDs or random numbers
+3. VARY schedules based on ACTUAL weather conditions per day:
+   - Hot days (>25°C): Increase cooling devices, reduce heating
+   - Cold days (<15°C): Increase heating, reduce cooling
+   - Rainy/cloudy: Can use more indoor devices
+   - Sunny: Reduce indoor device usage during peak sun
+4. EVERY device the user added MUST be scheduled for reasonable hours each day
+5. Schedules MUST differ between days based on weather
+6. Minimum usage per device per day: 1 hour (unless weather makes it unnecessary)
 
-Return ONLY this JSON:
+USER BUDGET: ${data.energyCosts.currencySymbol}${data.energyCosts.preferredBudget || 0}/month
+
+Generate 3 DIFFERENT optimization plans:
+
+PLAN 1 - COST SAVER:
+- Minimize energy costs while meeting basic needs
+- Shift usage to off-peak hours where possible  
+- Reduce non-essential device hours
+- Target: Save 20-30% vs unoptimized
+
+PLAN 2 - ECO MODE:
+- Minimize environmental impact
+- Drastically reduce high-wattage devices
+- Optimize based on weather to avoid waste
+- Target: 15-25% eco improvement
+
+PLAN 3 - COMFORT BALANCE:
+- Balance cost savings with comfort
+- Respect user priorities (high priority = more hours)
+- Weather-appropriate comfort levels
+- Target: 10-20% budget reduction + 5-15% eco improvement
+
+JSON STRUCTURE (return ONLY valid JSON):
 {
-  "costSaver": {"metrics":{...}, "dailySchedules":[...], "dailyTips":[...], "smartAlerts":[...]},
-  "ecoMode": {"metrics":{...}, "dailySchedules":[...], "dailyTips":[...], "smartAlerts":[...]},
-  "comfortBalance": {"metrics":{...}, "dailySchedules":[...], "dailyTips":[...], "smartAlerts":[...]}
+  "costSaver": {
+    "metrics": {
+      "initialBudget": ${data.energyCosts.preferredBudget || 120},
+      "optimizedBudget": <calculate based on reduced usage>,
+      "monthly Saving": <initialBudget - optimizedBudget>
+    },
+    "dailySchedules": [
+      {
+        "dayNumber": ${startDay},
+        "date": "2025-12-<day>",
+        "day": "Monday",
+        "${data.devices[0]?.id || 'device1'}": { "usage": <hours>, "window": "time" },
+        "${data.devices[1]?.id || 'device2'}": { "usage": <hours>, "window": "time" }
+      }
+    ],
+    "dailyTips": [{"dayNumber": ${startDay}, "tip": "Brief tip based on weather"}],
+    "smartAlerts": []
+  },
+  "ecoMode": { <same structure> },
+  "comfortBalance": { <same structure> }
 }
 
-Keep JSON COMPACT. NO explanations.`;
+SMART ALERTS MUST BE ACTIONABLE AND WEATHER-BASED:
+Generate 3-5 alerts that help users optimize energy:
+✓ "Weather will be cold on Dec 15-17, use heating devices only"
+✓ "Hot weather expected Dec 20-22, avoid heating appliances"
+✓ "Turn off TV when not in use - can save up to 10% monthly"
+✓ "Reduce freezer usage during peak hours (2pm-6pm)"
+✓ "Rainy days ahead - good time for indoor device maintenance"
+✗ DO NOT: Generic alerts like "Save energy" or "Be efficient"
+
+EXAMPLE for a HOT day (30°C, Sunny):
+- Cooling devices: MORE hours
+- TV/Freezer: NORMAL hours
+- Heating: ZERO hours
+
+EXAMPLE for a COLD day (10°C, Rainy):
+- Heating devices: MORE hours
+- Cooling: ZERO hours
+- Indoor devices like TV: INCREASE (people stay inside)
+
+Keep response COMPACT. Return ONLY JSON. NO markdown, NO explanations.`;
     }
 
     /**
