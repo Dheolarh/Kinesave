@@ -14,7 +14,8 @@ import type {
  */
 class AIPlanService {
     /**
-     * Generate all three optimization plans for selected devices
+     * Generate AI-powered energy plans for given devices
+     * Uses chunked generation (7 days at a time) to avoid token limits
      */
     async generatePlans(deviceIds: string[]): Promise<AIPlansResponse> {
         try {
@@ -23,21 +24,36 @@ class AIPlanService {
             // Step 1: Prepare analysis input data
             const inputData = await this.prepareAnalysisInput(deviceIds);
 
-            // Step 2: Build AI prompt
-            const prompt = this.buildPrompt(inputData);
+            // Step 2: Generate plans in 3-day chunks (10 chunks for 30 days)
+            console.log('Generating plans in 3-day chunks...');
 
-            // Step 3: Call AWS Bedrock
-            console.log('Calling AWS Bedrock...');
-            const aiResponse = await bedrockService.getJSONResponse(
-                prompt,
-                this.getSystemPrompt()
-            );
+            const chunks = [];
+            const totalDays = inputData.analysisDays;
+            const chunkSize = 3; // Reduced to 3 days for safer token limits
 
-            // Step 4: Parse and validate response
-            const parsedPlans = this.parseAIResponse(aiResponse, inputData);
+            for (let startDay = 1; startDay <= totalDays; startDay += chunkSize) {
+                const endDay = Math.min(startDay + chunkSize - 1, totalDays);
+                console.log(`Generating days ${startDay}-${endDay}...`);
+
+                const chunkPrompt = this.buildChunkPrompt(inputData, startDay, endDay);
+                const chunkResponse = await bedrockService.getJSONResponse(
+                    chunkPrompt,
+                    this.getSystemPrompt()
+                );
+
+                chunks.push({
+                    startDay,
+                    endDay,
+                    data: chunkResponse
+                });
+            }
+
+            // Step 3: Combine all chunks into complete plans
+            console.log('Combining chunks into complete plans...');
+            const completePlans = this.combineChunks(chunks, inputData);
 
             console.log('AI plan generation complete');
-            return parsedPlans;
+            return completePlans;
         } catch (error: any) {
             console.error('AI plan generation failed:', error);
             throw new Error(`Failed to generate AI plans: ${error.message}`);
@@ -114,6 +130,7 @@ class AIPlanService {
             },
             weatherForecast,
             analysisDays,
+            weatherSource: FEATURES.usePremiumWeatherAPI ? 'openweathermap' : analysisDays > 16 ? 'hybrid' : 'open-meteo',
         };
     }
 
@@ -140,7 +157,131 @@ Your responses must be valid JSON only. No explanatory text before or after the 
     }
 
     /**
-     * Build main analysis prompt
+     * Build prompt for a specific day range (chunk)
+     */
+    private buildChunkPrompt(data: AIAnalysisInput, startDay: number, endDay: number): string {
+        const deviceList = data.devices.map((d, i) =>
+            `${i + 1}. ${d.name} (${d.type}): ${d.wattage}W, Priority ${d.priority}, ${d.survey.hoursPerDay}hrs/day`
+        ).join('\n');
+
+        const weatherChunk = data.weatherForecast.slice(startDay - 1, endDay);
+
+        return `Generate energy plans for days ${startDay}-${endDay} (${endDay - startDay + 1} days).
+
+DEVICES: ${deviceList}
+WEATHER: ${JSON.stringify(weatherChunk)}
+BUDGET: ${data.energyCosts.currencySymbol}${data.energyCosts.preferredBudget || 0}/month (${((data.energyCosts.preferredBudget || 0) / 30).toFixed(2)}/day max)
+
+Generate 3 plans (costSaver, ecoMode, comfortBalance) with:
+
+1. METRICS (calculate for full ${data.analysisDays} days):
+   - costSaver: {"initialBudget": ${data.energyCosts.preferredBudget || 0}, "optimizedBudget": <calculated>, "monthlySaving": <difference>}
+   - ecoMode: {"initialEcoScore": 100, "optimizedEcoScore": <calculated 0-100>, "ecoImprovementPercentage": <improvement>, "monthlyCostCap": ${data.energyCosts.preferredBudget ? data.energyCosts.preferredBudget * 1.5 : 0}}
+   - comfortBalance: {"optimized Budget": <calculated>, "budgetReductionPercentage": <percent>, "ecoFriendlyGainPercentage": <percent>}
+
+2. dailySchedules: For days ${startDay}-${endDay}, simple array with date & device hours
+3. dailyTips: dayNumber, 3-5 SHORT tips per day
+4. smartAlerts: 3-5 brief alerts (only in LAST chunk for days 28-30)
+
+Return ONLY this JSON:
+{
+  "costSaver": {"metrics":{...}, "dailySchedules":[...], "dailyTips":[...], "smartAlerts":[...]},
+  "ecoMode": {"metrics":{...}, "dailySchedules":[...], "dailyTips":[...], "smartAlerts":[...]},
+  "comfortBalance": {"metrics":{...}, "dailySchedules":[...], "dailyTips":[...], "smartAlerts":[...]}
+}
+
+Keep JSON COMPACT. NO explanations.`;
+    }
+
+    /**
+     * Combine all chunks into complete 30-day plans
+     */
+    private combineChunks(chunks: any[], inputData: AIAnalysisInput): AIPlansResponse {
+        const now = new Date();
+        const validUntil = new Date(now);
+        validUntil.setDate(validUntil.getDate() + 30);
+
+        // Initialize combined structure
+        const combined: Record<string, any> = {
+            costSaver: {
+                id: 'cost-saver-plan',
+                type: 'cost',
+                name: 'Cost Saver',
+                dailySchedules: [],
+                dailyTips: [],
+                smartAlerts: [],
+                devices: inputData.devices.map(d => d.id),
+                metrics: { initialBudget: 0, optimizedBudget: 0, monthlySaving: 0 }
+            },
+            ecoMode: {
+                id: 'eco-mode-plan',
+                type: 'eco',
+                name: 'Eco Mode',
+                dailySchedules: [],
+                dailyTips: [],
+                smartAlerts: [],
+                devices: inputData.devices.map(d => d.id),
+                metrics: { initialEcoScore: 0, optimizedEcoScore: 0, ecoImprovementPercentage: 0, monthlyCostCap: 0 }
+            },
+            comfortBalance: {
+                id: 'balanced-plan',
+                type: 'balance',
+                name: 'Comfort Balance',
+                dailySchedules: [],
+                dailyTips: [],
+                smartAlerts: [],
+                devices: inputData.devices.map(d => d.id),
+                metrics: { optimizedBudget: 0, budgetReductionPercentage: 0, ecoFriendlyGainPercentage: 0 }
+            }
+        };
+
+        // Combine chunks
+        for (const chunk of chunks) {
+            const plans = chunk.data;
+
+            for (const planType of ['costSaver', 'ecoMode', 'comfortBalance']) {
+                if (plans[planType]) {
+                    // Merge daily schedules
+                    if (plans[planType].dailySchedules) {
+                        combined[planType].dailySchedules.push(...plans[planType].dailySchedules);
+                    }
+
+                    // Merge daily tips
+                    if (plans[planType].dailyTips) {
+                        combined[planType].dailyTips.push(...plans[planType].dailyTips);
+                    }
+
+                    // Collect smart alerts (deduplicate later)
+                    if (plans[planType].smartAlerts) {
+                        combined[planType].smartAlerts.push(...plans[planType].smartAlerts);
+                    }
+
+                    // Use metrics from last chunk (most complete)
+                    if (plans[planType].metrics) {
+                        combined[planType].metrics = plans[planType].metrics;
+                    }
+                }
+            }
+        }
+
+        // Deduplicate smart alerts
+        for (const planType of ['costSaver', 'ecoMode', 'comfortBalance']) {
+            combined[planType].smartAlerts = [...new Set(combined[planType].smartAlerts)];
+        }
+
+        return {
+            costSaver: combined.costSaver as any,
+            ecoMode: combined.ecoMode as any,
+            comfortBalance: combined.comfortBalance as any,
+            generatedAt: now.toISOString(),
+            validUntil: validUntil.toISOString(),
+            analysisDays: inputData.analysisDays,
+            weatherSource: inputData.weatherSource,
+        };
+    }
+
+    /**
+     * Build main analysis prompt (deprecated - now using buildChunkPrompt)
      */
     private buildPrompt(data: AIAnalysisInput): string {
         const deviceList = data.devices.map((d, i) =>

@@ -10,12 +10,16 @@ import {
 
 export class BedrockService {
     private client: BedrockRuntimeClient;
-    private modelId: string = 'anthropic.claude-3-sonnet-20240229-v1:0';
+    private modelId: string = 'anthropic.claude-3-sonnet-20240229-v1:0'; // Works with on-demand throughput
 
     constructor() {
-        // Initialize Bedrock client
+        // Initialize Bedrock client with credentials
         this.client = new BedrockRuntimeClient({
-            region: process.env.AWS_REGION || 'us-east-1',
+            region: import.meta.env.VITE_AWS_REGION || 'us-east-1',
+            credentials: {
+                accessKeyId: import.meta.env.VITE_AWS_ACCESS_KEY_ID || '',
+                secretAccessKey: import.meta.env.VITE_AWS_SECRET_ACCESS_KEY || '',
+            },
         });
     }
 
@@ -32,7 +36,7 @@ export class BedrockService {
         try {
             const requestBody = {
                 anthropic_version: 'bedrock-2023-05-31',
-                max_tokens: 4096,
+                max_tokens: 8192, // Claude 3 Sonnet max output
                 temperature: 0.7,
                 messages: [
                     {

@@ -13,6 +13,7 @@ export interface AIAnalysisInput {
     location: LocationContext;
     weatherForecast: WeatherForecast[];
     analysisDays: number; // 16 or 30 based on subscription
+    weatherSource: 'open-meteo' | 'openweathermap' | 'hybrid';
 }
 
 export interface DeviceForAnalysis {

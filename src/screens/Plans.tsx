@@ -55,19 +55,8 @@ export default function Plans() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 pb-20">
-        <div className="px-5 pt-8">
-          <h1 className="text-3xl mb-4 tracking-tight">Recommended Plans</h1>
-          <div className="bg-orange-50 border border-orange-200 rounded-2xl p-6">
-            <p className="text-sm text-orange-600">{error}</p>
-            <button
-              onClick={() => navigate('/ai-analysis')}
-              className="mt-4 px-6 py-2 bg-black text-white rounded-full text-sm"
-            >
-              Run Analysis
-            </button>
-          </div>
-        </div>
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 pb-20 flex items-center justify-center">
+        <h1 className="text-2xl text-black/60">No Plans Yet</h1>
         <BottomNav active="plans" />
       </div>
     );

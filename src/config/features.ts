@@ -46,7 +46,7 @@ export const FEATURES: FeatureConfig = {
     usePremiumWeatherAPI: false, // MVP: Use free hybrid approach
 
     // OpenWeatherMap API key (add when enabling premium)
-    openWeatherMapApiKey: process.env.OPENWEATHER_API_KEY || undefined,
+    openWeatherMapApiKey: import.meta.env.VITE_OPENWEATHER_API_KEY || undefined,
 };
 
 /**
