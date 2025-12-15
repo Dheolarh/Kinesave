@@ -67,7 +67,7 @@ export const DEVICE_TYPES: DeviceType[] = [
     // Water & Utilities
     { value: 'water_pump', label: 'Water Pump', icon: Droplets, category: 'Utilities' },
     { value: 'water_heater', label: 'Water Heater', icon: Flame, category: 'Utilities' },
-    { value: 'generator', label: 'Generator', icon: Zap, category: 'Utilities' },
+    { value: 'inverters', label: 'Inverters', icon: Zap, category: 'Utilities' },
 
     // Outdoor
     { value: 'lawn_mower', label: 'Lawn Mower (Electric)', icon: Scissors, category: 'Outdoor' },
