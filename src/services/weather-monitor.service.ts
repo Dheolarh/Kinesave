@@ -1,4 +1,3 @@
-import weatherService from './weather.service';
 import notificationService from './notification.service';
 import { getCurrentUserProfile } from '../utils/storage';
 

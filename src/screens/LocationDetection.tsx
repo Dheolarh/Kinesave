@@ -179,7 +179,7 @@ export default function LocationDetection() {
             <p className="text-sm text-black/60 leading-relaxed mb-4">
               {error
                 ? error
-                : "We tailor your energy optimization to your climate."}
+                : "Provide your location for accurate analysis"}
             </p>
 
             {locationData && !error && (

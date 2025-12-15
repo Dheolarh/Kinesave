@@ -1,11 +1,32 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router";
-import { ArrowLeft, TrendingDown, Wind, Droplets, Bell, Sun, X, Tv, Lightbulb } from "lucide-react";
+import { ArrowLeft, TrendingDown, Wind, Droplets, Bell, Sun, X, Tv, Lightbulb, Zap, Cloud, CloudRain, CloudSnow, CloudDrizzle } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { Calendar } from "../components/ui/calendar";
 import BottomNav from "../components/BottomNav";
 import notificationService from "../services/notification.service";
 import type { AIPlan } from "../types/ai-plan.types";
+
+// Helper function to get weather icon based on condition
+const getWeatherIcon = (condition: string) => {
+    const cond = condition?.toLowerCase() || '';
+    const iconClass = "w-4 h-4 text-black/60";
+    const strokeWidth = 1.5;
+
+    if (cond.includes('rain') || cond.includes('shower')) {
+        return <CloudRain className={iconClass} strokeWidth={strokeWidth} />;
+    } else if (cond.includes('snow') || cond.includes('sleet')) {
+        return <CloudSnow className={iconClass} strokeWidth={strokeWidth} />;
+    } else if (cond.includes('drizzle')) {
+        return <CloudDrizzle className={iconClass} strokeWidth={strokeWidth} />;
+    } else if (cond.includes('cloud') || cond.includes('overcast')) {
+        return <Cloud className={iconClass} strokeWidth={strokeWidth} />;
+    } else if (cond.includes('clear') || cond.includes('sunny')) {
+        return <Sun className={iconClass} strokeWidth={strokeWidth} />;
+    } else {
+        return <Sun className={iconClass} strokeWidth={strokeWidth} />;
+    }
+};
 
 export default function PlanDetails() {
     const { id } = useParams();
@@ -17,6 +38,7 @@ export default function PlanDetails() {
     const [plan, setPlan] = useState<AIPlan | null>(null);
     const [loading, setLoading] = useState(true);
     const [deviceNames, setDeviceNames] = useState<Record<string, any>>({});
+    const [currencySymbol, setCurrencySymbol] = useState('$');
 
     // Load AI plan and device names from localStorage
     useEffect(() => {
@@ -43,15 +65,32 @@ export default function PlanDetails() {
 
                 setPlan(selectedPlan);
 
-                // Load device names
-                const profileStr = localStorage.getItem('userEnergyProfile');
-                if (profileStr) {
-                    const profile = JSON.parse(profileStr);
+                // Load device names from users object
+                const usersStr = localStorage.getItem('users');
+                const userId = localStorage.getItem('currentUserId');
+
+                if (usersStr && userId) {
+                    const users = JSON.parse(usersStr);
+                    const userDevices = users[userId]?.devices || users[userId.trim()]?.devices; // Handle trailing space
+
                     const devicesMap: Record<string, any> = {};
-                    profile.devices?.forEach((device: any) => {
-                        devicesMap[device.id] = device;
+                    userDevices?.forEach((device: any) => {
+                        devicesMap[device.id] = {
+                            name: device.customName || device.originalName || device.name,
+                            type: device.deviceType || device.type,
+                            wattage: device.wattage,
+                            hoursPerDay: device.survey?.hoursPerDay
+                        };
                     });
                     setDeviceNames(devicesMap);
+                    console.log('Loaded devices:', devicesMap);
+                }
+
+                // Load currency symbol
+                const energyData = localStorage.getItem('energyData');
+                if (energyData) {
+                    const data = JSON.parse(energyData);
+                    setCurrencySymbol(data.currencySymbol || '$');
                 }
             } catch (error) {
                 console.error('Failed to load plan:', error);
@@ -66,30 +105,30 @@ export default function PlanDetails() {
 
     // Get metrics display based on plan type
     const getMetricsDisplay = () => {
-        if (!plan) return { label1: "", value1: "$0", label2: "", value2: "0%" };
+        if (!plan) return { label1: "", value1: `${currencySymbol}0`, label2: "", value2: "0%" };
 
         const metrics = plan.metrics as any;
 
         if (plan.type === 'cost') {
             return {
                 label1: "Monthly Savings",
-                value1: `$${metrics.monthlySaving || 0}`,
+                value1: `${currencySymbol}${metrics.monthlySaving || 0} `,
                 label2: "Efficiency Gain",
-                value2: `${Math.round((metrics.monthlySaving / (metrics.initialBudget || 1)) * 100)}%`
+                value2: `${Math.round((metrics.monthlySaving / (metrics.initialBudget || 1)) * 100)}% `
             };
         } else if (plan.type === 'eco') {
             return {
                 label1: "Eco Friendly",
-                value1: `+${metrics.ecoImprovementPercentage || 0}%`,
+                value1: `+ ${metrics.ecoImprovementPercentage || 0}% `,
                 label2: "Monthly Cost Cap",
-                value2: `$${metrics.monthlyCostCap || 0}`
+                value2: `${currencySymbol}${metrics.monthlyCostCap || 0} `
             };
         } else {
             return {
                 label1: "Budget Reduction",
-                value1: `${metrics.budgetReductionPercentage || 0}%`,
+                value1: `${metrics.budgetReductionPercentage || 0}% `,
                 label2: "Eco Gain",
-                value2: `+${metrics.ecoFriendlyGainPercentage || 0}%`
+                value2: `+ ${metrics.ecoFriendlyGainPercentage || 0}% `
             };
         }
     };
@@ -149,7 +188,7 @@ export default function PlanDetails() {
         const activePlan = {
             id,
             name: plan.name,
-            savings: `$${savings.toFixed(2)}`,
+            savings: `${currencySymbol}${savings.toFixed(2)} `,
             status: "active",
             type: plan.type,
         };
@@ -251,37 +290,60 @@ export default function PlanDetails() {
                     <h2 className="text-xs tracking-wide text-black/60 mb-3">DEVICES INCLUDED</h2>
                     <div className="space-y-2">
                         {plan.devices && plan.devices.length > 0 ? (
-                            plan.devices.map((deviceId: string, index: number) => (
+                            plan.devices.map((deviceId: string) => (
                                 <motion.div
                                     key={deviceId}
-                                    className="bg-white/40 backdrop-blur-xl border border-white/60 rounded-2xl p-4 flex items-center gap-3 shadow-lg"
-                                    initial={{ opacity: 0, x: -10 }}
-                                    animate={{ opacity: 1, x: 0 }}
-                                    transition={{ delay: 0.2 + index * 0.05 }}
+                                    whileTap={{ scale: 0.97 }}
+                                    className="flex items-center justify-between gap-3 p-4 rounded-2xl bg-white/50 border border-white/60 shadow-lg"
                                 >
-                                    <div className="w-10 h-10 bg-white/50 backdrop-blur-sm border border-white/60 rounded-xl flex items-center justify-center flex-shrink-0">
-                                        {deviceId.toLowerCase().includes('tv') ? (
-                                            <Tv className="w-5 h-5" strokeWidth={1.5} />
-                                        ) : deviceId.toLowerCase().includes('light') ? (
-                                            <Lightbulb className="w-5 h-5" strokeWidth={1.5} />
-                                        ) : deviceId.toLowerCase().includes('pump') || deviceId.toLowerCase().includes('water') ? (
-                                            <Droplets className="w-5 h-5" strokeWidth={1.5} />
-                                        ) : (
-                                            <Wind className="w-5 h-5" strokeWidth={1.5} />
-                                        )}
-                                    </div>
-                                    <div className="flex-1">
-                                        <div className="text-sm">
+                                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                                        <div className="w-10 h-10 bg-white/50 backdrop-blur-sm border border-white/60 rounded-xl flex items-center justify-center flex-shrink-0">
                                             {(() => {
-                                                const device = deviceNames[deviceId];
-                                                console.log('Device lookup:', deviceId, device, deviceNames);
-                                                return device?.name || deviceId.replace(/_/g, ' ').replace(/^dev\s+/, '');
+                                                const deviceType = deviceNames[deviceId]?.type?.toLowerCase() || '';
+                                                if (deviceType.includes('tv') || deviceType.includes('television')) {
+                                                    return <Tv className="w-5 h-5" strokeWidth={1.5} />;
+                                                } else if (deviceType.includes('light') || deviceType.includes('bulb')) {
+                                                    return <Lightbulb className="w-5 h-5" strokeWidth={1.5} />;
+                                                } else if (deviceType.includes('pump') || deviceType.includes('water')) {
+                                                    return <Droplets className="w-5 h-5" strokeWidth={1.5} />;
+                                                } else if (deviceType.includes('refrigerator') || deviceType.includes('freezer') || deviceType.includes('fridge')) {
+                                                    return <Wind className="w-5 h-5" strokeWidth={1.5} />;
+                                                } else {
+                                                    return <Zap className="w-5 h-5" strokeWidth={1.5} />;
+                                                }
                                             })()}
                                         </div>
-                                        {deviceNames[deviceId]?.wattage && (
-                                            <div className="text-xs text-black/50">{deviceNames[deviceId].wattage}W</div>
-                                        )}
+                                        <div className="flex-1 min-w-0">
+                                            <div className="text-sm font-medium truncate">
+                                                {(() => {
+                                                    console.log('Looking for deviceId:', deviceId);
+                                                    console.log('Available devices:', Object.keys(deviceNames));
+
+                                                    // Try exact match first
+                                                    if (deviceNames[deviceId]?.name) {
+                                                        return deviceNames[deviceId].name;
+                                                    }
+
+                                                    // Try fuzzy match (AI might have modified the ID)
+                                                    const fuzzyMatch = Object.keys(deviceNames).find(key =>
+                                                        deviceId.includes(key) || key.includes(deviceId.split('_')[0])
+                                                    );
+
+                                                    if (fuzzyMatch && deviceNames[fuzzyMatch]?.name) {
+                                                        console.log('Fuzzy matched:', fuzzyMatch, '->', deviceNames[fuzzyMatch].name);
+                                                        return deviceNames[fuzzyMatch].name;
+                                                    }
+
+                                                    console.warn('No match found for:', deviceId);
+                                                    return deviceId;
+                                                })()}
+                                            </div>
+                                            {deviceNames[deviceId]?.wattage && (
+                                                <div className="text-xs text-black/50">{deviceNames[deviceId].wattage}W</div>
+                                            )}
+                                        </div>
                                     </div>
+
                                 </motion.div>
                             ))
                         ) : (
@@ -383,15 +445,17 @@ export default function PlanDetails() {
                         >
                             <div className="flex items-center justify-between mb-4">
                                 <div>
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <Sun className="w-5 h-5" />
-                                        <span className="text-sm font-medium">
-                                            {selectedDate?.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
-                                        </span>
+                                    <h3 className="text-lg font-medium">
+                                        {selectedDate?.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+                                    </h3>
+                                    <div className="flex items-center gap-2 mt-1">
+                                        {dailySchedule?.weather && typeof dailySchedule.weather === 'object' && (
+                                            <>
+                                                <span className="text-sm text-black/60">{dailySchedule.weather.condition}</span>
+                                                {getWeatherIcon(dailySchedule.weather.condition)}
+                                            </>
+                                        )}
                                     </div>
-                                    <p className="text-xs text-black/50">
-                                        {dailySchedule ? 'AI-Optimized Schedule' : 'No schedule available'}
-                                    </p>
                                 </div>
                                 <button
                                     onClick={() => setShowModal(false)}
@@ -403,49 +467,65 @@ export default function PlanDetails() {
 
                             {dailySchedule ? (
                                 <div className="space-y-3">
-                                    {Object.entries(dailySchedule)
-                                        .filter(([key]) => key !== 'date' && key !== 'day' && key !== 'dayNumber')
-                                        .map(([deviceId, schedule]: [string, any]) => {
-                                            const device = deviceNames[deviceId];
-                                            const usage = typeof schedule === 'number' ? schedule :
-                                                typeof schedule === 'object' && schedule.usage ? schedule.usage :
-                                                    typeof schedule === 'object' && schedule.hours ? schedule.hours : null;
+                                    {Object.keys(dailySchedule || {}).filter(key => !['dayNumber', 'date', 'day', 'weather'].includes(key)).map((deviceId) => {
+                                        const usage = (dailySchedule as any)[deviceId];
+                                        if (!usage || typeof usage !== 'object') return null;
 
-                                            return (
-                                                <div
-                                                    key={deviceId}
-                                                    className="bg-white/60 backdrop-blur-xl border border-white/60 rounded-xl p-4"
-                                                >
-                                                    <div className="flex items-center justify-between">
-                                                        <div className="flex items-center gap-3">
-                                                            <div className="w-8 h-8 bg-white/50 rounded-lg flex items-center justify-center">
-                                                                {deviceId.toLowerCase().includes('tv') ? (
-                                                                    <Tv className="w-4 h-4" strokeWidth={1.5} />
-                                                                ) : deviceId.toLowerCase().includes('pump') || deviceId.toLowerCase().includes('water') ? (
-                                                                    <Droplets className="w-4 h-4" strokeWidth={1.5} />
-                                                                ) : (
-                                                                    <Wind className="w-4 h-4" strokeWidth={1.5} />
-                                                                )}
-                                                            </div>
-                                                            <div>
-                                                                <div className="text-sm">{device?.name || deviceId.replace(/_/g, ' ')}</div>
-                                                                {device?.priority && (
-                                                                    <div className="text-xs text-black/50">Priority: {device.priority}</div>
-                                                                )}
-                                                            </div>
+                                        const device = deviceNames[deviceId];
+                                        const deviceType = device?.type?.toLowerCase() || '';
+
+                                        return (
+                                            <div
+                                                key={deviceId}
+                                                className="flex items-center justify-between p-3 bg-white/40 backdrop-blur-xl border border-white/60 rounded-xl shadow-lg"
+                                            >
+                                                <div className="flex items-center gap-3 flex-1 min-w-0">
+                                                    <div className="w-8 h-8 bg-white/50 backdrop-blur-sm border border-white/60 rounded-lg flex items-center justify-center flex-shrink-0">
+                                                        {deviceType.includes('tv') || deviceType.includes('television') ? (
+                                                            <Tv className="w-4 h-4" strokeWidth={1.5} />
+                                                        ) : deviceType.includes('light') || deviceType.includes('bulb') ? (
+                                                            <Lightbulb className="w-4 h-4" strokeWidth={1.5} />
+                                                        ) : deviceType.includes('pump') || deviceType.includes('water') ? (
+                                                            <Droplets className="w-4 h-4" strokeWidth={1.5} />
+                                                        ) : deviceType.includes('refrigerator') || deviceType.includes('freezer') || deviceType.includes('fridge') ? (
+                                                            <Wind className="w-4 h-4" strokeWidth={1.5} />
+                                                        ) : (
+                                                            <Zap className="w-4 h-4" strokeWidth={1.5} />
+                                                        )}
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="text-sm font-medium truncate">
+                                                            {(() => {
+                                                                // Try exact match first
+                                                                if (device?.name) return device.name;
+
+                                                                // Try fuzzy match
+                                                                const fuzzyMatch = Object.keys(deviceNames).find(key =>
+                                                                    deviceId.includes(key) || key.includes(deviceId.split('_')[0])
+                                                                );
+
+                                                                if (fuzzyMatch && deviceNames[fuzzyMatch]?.name) {
+                                                                    return deviceNames[fuzzyMatch].name;
+                                                                }
+
+                                                                return deviceId;
+                                                            })()}
                                                         </div>
-                                                        <div className="text-right">
-                                                            <p className="text-sm font-medium">
-                                                                {usage !== null ? `${usage} hrs` : 'Off'}
-                                                            </p>
-                                                            {schedule.window && (
-                                                                <p className="text-xs text-black/50">{schedule.window}</p>
-                                                            )}
-                                                        </div>
+                                                        {usage.window && (
+                                                            <div className="text-xs text-black/50">{usage.window}</div>
+                                                        )}
                                                     </div>
                                                 </div>
-                                            );
-                                        })}
+                                                <div className="text-sm font-medium text-black/60 flex-shrink-0 ml-2">
+                                                    {usage.usage ? `${usage.usage} hrs` : 'Off'}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+
+                                    {(!dailySchedule || Object.keys(dailySchedule).filter(key => !['dayNumber', 'date', 'day', 'weather'].includes(key)).length === 0) && (
+                                        <p className="text-sm text-black/50 text-center py-4">No devices scheduled for this day</p>
+                                    )}
                                 </div>
                             ) : (
                                 <div className="text-center py-8">

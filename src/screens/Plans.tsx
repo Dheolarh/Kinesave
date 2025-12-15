@@ -16,10 +16,13 @@ export default function Plans() {
   const [plans, setPlans] = useState<AIPlan[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [notificationCount, setNotificationCount] = useState(0);
+  const [currencySymbol, setCurrencySymbol] = useState('$');
 
   // Load AI-generated plans from localStorage
   useEffect(() => {
-    const loadPlans = () => {
+    const loadPlansAndCurrency = () => {
       try {
         const savedPlans = localStorage.getItem('aiGeneratedPlans');
         if (savedPlans) {
@@ -32,14 +35,27 @@ export default function Plans() {
         } else {
           setError('No plans generated yet. Please run analysis from the dashboard.');
         }
+
+        // Load currency symbol
+        const energyData = localStorage.getItem('energyData');
+        if (energyData) {
+          const data = JSON.parse(energyData);
+          setCurrencySymbol(data.currencySymbol || '$');
+        }
       } catch (err) {
-        console.error('Failed to load plans:', err);
+        console.error('Failed to load plans or currency:', err);
         setError('Failed to load plans. Please try running analysis again.');
       } finally {
         setLoading(false);
       }
     };
-    loadPlans();
+    loadPlansAndCurrency();
+
+    // Update notification count (assuming notificationService is available)
+    // const updateCount = () => {
+    //   setNotificationCount(notificationService.getUnreadCount());
+    // };
+    // updateCount();
   }, []);
 
   if (loading) {
@@ -109,12 +125,12 @@ export default function Plans() {
                   <>
                     <div>
                       <p className="text-xs text-black/50 mb-1">Initial Budget</p>
-                      <p className="text-lg tracking-tight">${plan.metrics.initialBudget || 0}</p>
+                      <p className="text-lg tracking-tight">{currencySymbol}{plan.metrics.initialBudget || 0}</p>
                     </div>
                     <div>
                       <p className="text-xs text-black/50 mb-1">Optimized Budget</p>
                       <p className="text-lg tracking-tight text-green-600">
-                        ${plan.metrics.optimizedBudget || 0}
+                        {currencySymbol}{plan.metrics.optimizedBudget || 0}
                       </p>
                     </div>
                   </>
@@ -132,7 +148,7 @@ export default function Plans() {
                     <div>
                       <p className="text-xs text-black/50 mb-1">Monthly Cost Cap</p>
                       <p className="text-lg tracking-tight">
-                        ${plan.metrics.monthlyCostCap || 0}
+                        {currencySymbol}{plan.metrics.monthlyCostCap || 0}
                       </p>
                     </div>
                   </>

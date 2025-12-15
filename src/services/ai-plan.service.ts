@@ -161,7 +161,7 @@ Your responses must be valid JSON only. No explanatory text before or after the 
      */
     private buildChunkPrompt(data: AIAnalysisInput, startDay: number, endDay: number): string {
         const deviceList = data.devices.map((d, i) =>
-            `${i + 1}. ID: "${d.id}" - ${d.name} (${d.type}): ${d.wattage}W, Priority ${d.priority}, User typically uses ${d.survey.hoursPerDay}hrs/day`
+            `${i + 1}. "${d.name}" (${d.type}) - ID: ${d.id}, ${d.wattage}W, Priority ${d.priority}, User typically uses ${d.survey.hoursPerDay}hrs/day`
         ).join('\n');
 
         const deviceIds = data.devices.map(d => d.id).join(', ');
@@ -197,16 +197,21 @@ USER BUDGET: ${data.energyCosts.currencySymbol}${data.energyCosts.preferredBudge
 
 Generate 3 DIFFERENT optimization plans:
 
+WEATHER-BASED SCHEDULING RULES:
+- Hot days (>25°C): More cooling devices, less heating
+- Cold days (<15°C): More heating devices, zero cooling
+- Rainy/cloudy: More indoor devices (TV, lights)
+- EVERY device must be scheduled EVERY day
+- Minimum usage per device per day: 1 hour (unless weather makes it unnecessary)
+- Schedules MUST differ between days based on weather
+
+PLAN OBJECTIVES:
 PLAN 1 - COST SAVER:
-- Minimize energy costs while meeting basic needs
-- Shift usage to off-peak hours where possible  
-- Reduce non-essential device hours
-- Target: Save 20-30% vs unoptimized
+- Maximize savings (target: 20-30% reduction)
+- Shift heavy usage to off-peak hours
 
 PLAN 2 - ECO MODE:
 - Minimize environmental impact
-- Drastically reduce high-wattage devices
-- Optimize based on weather to avoid waste
 - Target: 15-25% eco improvement
 
 PLAN 3 - COMFORT BALANCE:
@@ -215,19 +220,27 @@ PLAN 3 - COMFORT BALANCE:
 - Weather-appropriate comfort levels
 - Target: 10-20% budget reduction + 5-15% eco improvement
 
+CRITICAL DATE REQUIREMENTS:
+1. Use ACTUAL dates from the weather forecast provided above
+2. Each daily schedule MUST include a "weather" object with "condition" and "avgTemp" from the forecast
+3. DO NOT use hardcoded dates like "2025-12-X"
+4. Date format must be YYYY-MM-DD matching the forecast dates
+5. Day of week must match the actual date
+
 JSON STRUCTURE (return ONLY valid JSON):
 {
   "costSaver": {
     "metrics": {
       "initialBudget": ${data.energyCosts.preferredBudget || 120},
-      "optimizedBudget": <calculate based on reduced usage>,
-      "monthly Saving": <initialBudget - optimizedBudget>
+      "optimizedBudget": <calculate 20-30% less>,
+      "monthlySaving": <initialBudget - optimizedBudget>
     },
     "dailySchedules": [
       {
         "dayNumber": ${startDay},
-        "date": "2025-12-<day>",
-        "day": "Monday",
+        "date": "${weatherChunk[0]?.date || new Date().toISOString().split('T')[0]}",
+        "day": "${new Date(weatherChunk[0]?.date || new Date()).toLocaleDateString('en-US', { weekday: 'long' })}",
+        "weather": { "condition": "${weatherChunk[0]?.condition}", "avgTemp": ${weatherChunk[0]?.avgTemp} },
         "${data.devices[0]?.id || 'device1'}": { "usage": <hours>, "window": "time" },
         "${data.devices[1]?.id || 'device2'}": { "usage": <hours>, "window": "time" }
       }
@@ -235,9 +248,30 @@ JSON STRUCTURE (return ONLY valid JSON):
     "dailyTips": [{"dayNumber": ${startDay}, "tip": "Brief tip based on weather"}],
     "smartAlerts": []
   },
-  "ecoMode": { <same structure> },
-  "comfortBalance": { <same structure> }
+  "ecoMode": {
+    "metrics": {
+      "initialEcoScore": 100,
+      "optimizedEcoScore": <calculate 0-100>,
+      "ecoImprovementPercentage": <15-25>,
+      "monthlyCostCap": ${data.energyCosts.preferredBudget ? Math.round(data.energyCosts.preferredBudget * 1.5) : 180}
+    },
+    "dailySchedules": [...],
+    "dailyTips": [...],
+    "smartAlerts": []
+  },
+  "comfortBalance": {
+    "metrics": {
+      "optimizedBudget": <calculate>,
+      "budgetReductionPercentage": <10-20>,
+      "ecoFriendlyGainPercentage": <5-15>
+    },
+    "dailySchedules": [...],
+    "dailyTips": [...],
+    "smartAlerts": []
+  }
 }
+
+CRITICAL: Ensure ALL percentage fields (ecoImprovementPercentage, budgetReductionPercentage, ecoFriendlyGainPercentage) have numeric values between the target ranges, NOT zero.
 
 SMART ALERTS MUST BE ACTIONABLE AND WEATHER-BASED:
 Generate 3-5 alerts that help users optimize energy:

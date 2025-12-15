@@ -261,7 +261,15 @@ export default function Dashboard() {
                 <Bell className="w-5 h-5" strokeWidth={1.5} />
                 {/* Unread indicator dot */}
                 {unreadCount > 0 && (
-                  <div className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-black rounded-full" />
+                  <div
+                    className="absolute bg-black rounded-full"
+                    style={{
+                      top: '6px',
+                      right: '6px',
+                      width: '6px',
+                      height: '6px'
+                    }}
+                  />
                 )}
               </button>
             </div>

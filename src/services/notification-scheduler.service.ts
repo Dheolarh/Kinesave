@@ -104,16 +104,36 @@ class NotificationScheduler {
             );
 
             if (todaySchedule) {
-                const deviceCount = todaySchedule.deviceSchedules?.length || 0;
-                const cost = todaySchedule.estimatedCost?.toFixed(2) || '0.00';
+                // Count actual devices (filter out metadata keys)
+                const deviceKeys = Object.keys(todaySchedule).filter(
+                    key => !['dayNumber', 'date', 'day', 'weather'].includes(key)
+                );
+                const deviceCount = deviceKeys.length;
+
+                // Calculate estimated cost
+                const energyData = localStorage.getItem('energyData');
+                const pricePerKwh = energyData ? JSON.parse(energyData).pricePerKwh : 36;
+                const currencySymbol = energyData ? JSON.parse(energyData).currencySymbol : '$';
+
+                let totalCost = 0;
+                deviceKeys.forEach(deviceId => {
+                    const usage = todaySchedule[deviceId];
+                    if (usage && typeof usage === 'object' && usage.usage) {
+                        // Rough estimate: assume average device is 150W
+                        const kwhUsed = (150 * usage.usage) / 1000;
+                        totalCost += kwhUsed * parseFloat(pricePerKwh);
+                    }
+                });
+
+                const cost = totalCost.toFixed(2);
                 const weather = todaySchedule.weather?.condition || 'Clear';
-                const temp = todaySchedule.weather?.temperature || 0;
+                const temp = todaySchedule.weather?.avgTemp || todaySchedule.weather?.temperature || 0;
 
                 await notificationService.send({
                     id: `daily_${Date.now()}`,
                     type: 'daily_reminder',
-                    title: '🌅 Good Morning! Time to Check Your Plan',
-                    message: `Today's ${plan.name || 'energy plan'}: ${deviceCount} devices, ${weather} ${temp}°C. Est. cost: $${cost}`,
+                    title: 'Good Morning! Time to Check Your Plan',
+                    message: `Today's ${plan.name || 'energy plan'}: ${deviceCount} devices, ${weather} ${temp}°C. Est. cost: ${currencySymbol}${cost}`,
                     timestamp: new Date().toISOString(),
                     read: false,
                     actionUrl: `/plan/${plan.id}`,

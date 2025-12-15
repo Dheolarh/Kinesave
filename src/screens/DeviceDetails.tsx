@@ -18,7 +18,7 @@ const iconMap = {
 };
 
 // Helper function to calculate estimated costs based on power rating
-const calculateDeviceCosts = (power: number, pricePerKwh: number) => {
+const calculateDeviceCosts = (power: number, pricePerKwh: number, currencySymbol: string = '$') => {
   const dailyUsageHours = Math.random() * 12 + 2; // Random between 2-14 hours
   const dailyKwh = (power / 1000) * dailyUsageHours;
   const dailyCost = dailyKwh * pricePerKwh;
@@ -26,8 +26,8 @@ const calculateDeviceCosts = (power: number, pricePerKwh: number) => {
 
   return {
     dailyUsage: `${dailyUsageHours.toFixed(1)} hrs`,
-    dailyCost: `$${dailyCost.toFixed(2)}`,
-    monthlyCost: `$${monthlyCost.toFixed(2)}`,
+    dailyCost: `${currencySymbol}${dailyCost.toFixed(2)}`,
+    monthlyCost: `${currencySymbol}${monthlyCost.toFixed(2)}`,
     efficiency: power > 1000 ? "A+" : power > 500 ? "A" : "B",
     heatOutput: power > 1000 ? `${Math.floor(power * 3.4)} BTU` : "N/A",
   };
@@ -53,8 +53,9 @@ export default function DeviceDetails() {
 
         if (foundDevice) {
           const pricePerKwh = profile?.energyCosts?.pricePerKwh || 0.15;
+          const currencySymbol = profile?.energyCosts?.currencySymbol || '$';
           const devicePower = foundDevice.wattage || 0;
-          const calculatedCosts = calculateDeviceCosts(devicePower, pricePerKwh);
+          const calculatedCosts = calculateDeviceCosts(devicePower, pricePerKwh, currencySymbol);
 
           setDevice({
             ...foundDevice,
