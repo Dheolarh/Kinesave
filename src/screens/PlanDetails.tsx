@@ -437,26 +437,21 @@ export default function PlanDetails() {
                             onClick={() => setShowModal(false)}
                         />
                         <motion.div
-                            className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-2xl rounded-t-3xl z-50 border-t border-white/60 shadow-[0_-10px_40px_rgba(0,0,0,0.1)] p-6 max-h-[75vh] overflow-y-auto"
+                            className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-2xl rounded-t-3xl z-50 border-t border-white/60 shadow-[0_-10px_40px_rgba(0,0,0,0.1)] flex flex-col"
+                            style={{ maxHeight: '80vh' }}
                             initial={{ y: "100%" }}
                             animate={{ y: 0 }}
                             exit={{ y: "100%" }}
                             transition={{ type: "spring", damping: 30, stiffness: 300 }}
                         >
-                            <div className="flex items-center justify-between mb-4">
-                                <div>
-                                    <h3 className="text-lg font-medium">
-                                        {selectedDate?.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
-                                    </h3>
-                                    <div className="flex items-center gap-2 mt-1">
-                                        {dailySchedule?.weather && typeof dailySchedule.weather === 'object' && (
-                                            <>
-                                                <span className="text-sm text-black/60">{dailySchedule.weather.condition}</span>
-                                                {getWeatherIcon(dailySchedule.weather.condition)}
-                                            </>
-                                        )}
-                                    </div>
-                                </div>
+                            <div className="flex items-center justify-between px-6 pt-6 pb-6 flex-shrink-0">
+                                <h2 className="text-xl tracking-tight">
+                                    {selectedDate?.toLocaleDateString('en-US', {
+                                        weekday: 'long',
+                                        month: 'long',
+                                        day: 'numeric'
+                                    })}
+                                </h2>
                                 <button
                                     onClick={() => setShowModal(false)}
                                     className="w-8 h-8 rounded-full border border-black/10 flex items-center justify-center hover:border-black/20 transition-colors"
@@ -465,73 +460,138 @@ export default function PlanDetails() {
                                 </button>
                             </div>
 
-                            {dailySchedule ? (
-                                <div className="space-y-3">
-                                    {Object.keys(dailySchedule || {}).filter(key => !['dayNumber', 'date', 'day', 'weather'].includes(key)).map((deviceId) => {
-                                        const usage = (dailySchedule as any)[deviceId];
-                                        if (!usage || typeof usage !== 'object') return null;
+                            <div className="px-6 pb-6 space-y-4 flex-shrink-0">
+                                {/* Weather Info */}
+                                {dailySchedule?.weather && typeof dailySchedule.weather === 'object' && (
+                                    <div className="flex items-center gap-3 bg-white/60 backdrop-blur-xl border border-white/60 rounded-2xl p-4 shadow-lg">
+                                        <div className="w-10 h-10 bg-white/50 backdrop-blur-sm border border-white/60 rounded-xl flex items-center justify-center">
+                                            {getWeatherIcon(dailySchedule.weather.condition)}
+                                        </div>
+                                        <div>
+                                            <div className="text-sm">{dailySchedule.weather.condition}</div>
+                                            <div className="text-xs text-black/50">Estimated Weather</div>
+                                        </div>
+                                    </div>
+                                )}
 
-                                        const device = deviceNames[deviceId];
-                                        const deviceType = device?.type?.toLowerCase() || '';
+                                {/* Summary Stats */}
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="bg-white/60 backdrop-blur-xl border border-white/60 rounded-2xl p-4 shadow-lg">
+                                        <div className="text-xl mb-1">
+                                            {(() => {
+                                                const deviceKeys = Object.keys(dailySchedule || {}).filter(k => !['dayNumber', 'date', 'day', 'weather'].includes(k));
+                                                let totalHours = 0;
+                                                deviceKeys.forEach(deviceId => {
+                                                    const usage = (dailySchedule as any)[deviceId];
+                                                    if (usage && typeof usage === 'object' && usage.usage) {
+                                                        totalHours += usage.usage;
+                                                    }
+                                                });
+                                                return `${totalHours.toFixed(1)} hrs`;
+                                            })()}
+                                        </div>
+                                        <div className="text-xs text-black/50">Total Usage</div>
+                                    </div>
+                                    <div className="bg-white/60 backdrop-blur-xl border border-white/60 rounded-2xl p-4 shadow-lg">
+                                        <div className="text-xl mb-1">
+                                            {(() => {
+                                                const energyData = localStorage.getItem('energyData');
+                                                const pricePerKwh = energyData ? JSON.parse(energyData).pricePerKwh : 36;
+                                                const currSym = currencySymbol;
 
-                                        return (
-                                            <div
-                                                key={deviceId}
-                                                className="flex items-center justify-between p-3 bg-white/40 backdrop-blur-xl border border-white/60 rounded-xl shadow-lg"
-                                            >
-                                                <div className="flex items-center gap-3 flex-1 min-w-0">
-                                                    <div className="w-8 h-8 bg-white/50 backdrop-blur-sm border border-white/60 rounded-lg flex items-center justify-center flex-shrink-0">
-                                                        {deviceType.includes('tv') || deviceType.includes('television') ? (
-                                                            <Tv className="w-4 h-4" strokeWidth={1.5} />
-                                                        ) : deviceType.includes('light') || deviceType.includes('bulb') ? (
-                                                            <Lightbulb className="w-4 h-4" strokeWidth={1.5} />
-                                                        ) : deviceType.includes('pump') || deviceType.includes('water') ? (
-                                                            <Droplets className="w-4 h-4" strokeWidth={1.5} />
-                                                        ) : deviceType.includes('refrigerator') || deviceType.includes('freezer') || deviceType.includes('fridge') ? (
-                                                            <Wind className="w-4 h-4" strokeWidth={1.5} />
-                                                        ) : (
-                                                            <Zap className="w-4 h-4" strokeWidth={1.5} />
-                                                        )}
-                                                    </div>
-                                                    <div className="flex-1 min-w-0">
-                                                        <div className="text-sm font-medium truncate">
-                                                            {(() => {
-                                                                // Try exact match first
-                                                                if (device?.name) return device.name;
+                                                const deviceKeys = Object.keys(dailySchedule || {}).filter(k => !['dayNumber', 'date', 'day', 'weather'].includes(k));
+                                                let totalCost = 0;
+                                                deviceKeys.forEach(deviceId => {
+                                                    const usage = (dailySchedule as any)[deviceId];
+                                                    if (usage && typeof usage === 'object' && usage.usage) {
+                                                        const kwhUsed = (150 * usage.usage) / 1000;
+                                                        totalCost += kwhUsed * parseFloat(pricePerKwh);
+                                                    }
+                                                });
+                                                return `${currSym}${totalCost.toFixed(2)}`;
+                                            })()}
+                                        </div>
+                                        <div className="text-xs text-black/50">Estimated Cost</div>
+                                    </div>
+                                </div>
 
-                                                                // Try fuzzy match
-                                                                const fuzzyMatch = Object.keys(deviceNames).find(key =>
-                                                                    deviceId.includes(key) || key.includes(deviceId.split('_')[0])
-                                                                );
+                                {/* Peak Usage */}
+                                <div className="bg-white/60 backdrop-blur-xl border border-white/60 rounded-2xl p-4 shadow-lg">
+                                    <div className="text-xs text-black/50 mb-1">Peak Usage Period</div>
+                                    <div className="text-sm">2pm - 6pm</div>
+                                </div>
 
-                                                                if (fuzzyMatch && deviceNames[fuzzyMatch]?.name) {
-                                                                    return deviceNames[fuzzyMatch].name;
-                                                                }
+                                {/* Devices Section Header */}
+                                <h3 className="text-xs tracking-wide text-black/60">DEVICES & USAGE</h3>
+                            </div>
 
-                                                                return deviceId;
-                                                            })()}
+                            {/* Scrollable Devices List */}
+                            <div className="px-6 pb-6 overflow-y-auto scrollbar-hide" style={{ flex: 1, minHeight: 0 }}>
+                                {dailySchedule ? (
+                                    <div className="space-y-2">
+                                        {Object.keys(dailySchedule || {}).filter(key => !['dayNumber', 'date', 'day', 'weather'].includes(key)).map((deviceId) => {
+                                            const usage = (dailySchedule as any)[deviceId];
+                                            if (!usage || typeof usage !== 'object') return null;
+
+                                            const device = deviceNames[deviceId];
+                                            const deviceType = device?.type?.toLowerCase() || '';
+
+                                            // Get device name
+                                            let deviceName = deviceId;
+                                            if (device?.name) {
+                                                deviceName = device.name;
+                                            } else {
+                                                const fuzzyMatch = Object.keys(deviceNames).find(key =>
+                                                    deviceId.includes(key) || key.includes(deviceId.split('_')[0])
+                                                );
+                                                if (fuzzyMatch && deviceNames[fuzzyMatch]?.name) {
+                                                    deviceName = deviceNames[fuzzyMatch].name;
+                                                }
+                                            }
+
+                                            // Determine priority
+                                            const priority = device?.priority ||
+                                                (deviceType.includes('tv') || deviceType.includes('light') ? 'Low' :
+                                                    deviceType.includes('refrigerator') || deviceType.includes('pump') ? 'High' : 'Medium');
+
+                                            return (
+                                                <div
+                                                    key={deviceId}
+                                                    className="bg-white/60 backdrop-blur-xl border border-white/60 rounded-2xl p-4 shadow-lg"
+                                                >
+                                                    <div className="flex items-center gap-3 mb-2">
+                                                        <div className="w-10 h-10 bg-white/50 backdrop-blur-sm border border-white/60 rounded-xl flex items-center justify-center flex-shrink-0">
+                                                            {deviceType.includes('tv') || deviceType.includes('television') ? (
+                                                                <Tv className="w-5 h-5" strokeWidth={1.5} />
+                                                            ) : deviceType.includes('light') || deviceType.includes('bulb') ? (
+                                                                <Lightbulb className="w-5 h-5" strokeWidth={1.5} />
+                                                            ) : deviceType.includes('pump') || deviceType.includes('water') ? (
+                                                                <Droplets className="w-5 h-5" strokeWidth={1.5} />
+                                                            ) : deviceType.includes('refrigerator') || deviceType.includes('freezer') || deviceType.includes('fridge') ? (
+                                                                <Wind className="w-5 h-5" strokeWidth={1.5} />
+                                                            ) : (
+                                                                <Zap className="w-5 h-5" strokeWidth={1.5} />
+                                                            )}
                                                         </div>
-                                                        {usage.window && (
-                                                            <div className="text-xs text-black/50">{usage.window}</div>
-                                                        )}
+                                                        <div className="flex-1">
+                                                            <div className="text-sm mb-0.5">{deviceName}</div>
+                                                            <div className="text-xs text-black/50">
+                                                                Priority: <span className={priority === 'High' ? 'text-black' : ''}>{priority}</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex justify-between items-center pt-2">
+                                                        <span className="text-xs text-black/50">Use Time</span>
+                                                        <span className="text-sm">{usage.usage ? `${usage.usage} hrs` : 'Off'}</span>
                                                     </div>
                                                 </div>
-                                                <div className="text-sm font-medium text-black/60 flex-shrink-0 ml-2">
-                                                    {usage.usage ? `${usage.usage} hrs` : 'Off'}
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-
-                                    {(!dailySchedule || Object.keys(dailySchedule).filter(key => !['dayNumber', 'date', 'day', 'weather'].includes(key)).length === 0) && (
-                                        <p className="text-sm text-black/50 text-center py-4">No devices scheduled for this day</p>
-                                    )}
-                                </div>
-                            ) : (
-                                <div className="text-center py-8">
-                                    <p className="text-sm text-black/50">No schedule data for this date</p>
-                                </div>
-                            )}
+                                            );
+                                        })}
+                                    </div>
+                                ) : (
+                                    <p className="text-sm text-black/60 text-center py-8">No schedule data available for this day.</p>
+                                )}
+                            </div>
                         </motion.div>
                     </>
                 )}
