@@ -273,14 +273,40 @@ JSON STRUCTURE (return ONLY valid JSON):
 
 CRITICAL: Ensure ALL percentage fields (ecoImprovementPercentage, budgetReductionPercentage, ecoFriendlyGainPercentage) have numeric values between the target ranges, NOT zero.
 
-SMART ALERTS MUST BE ACTIONABLE AND WEATHER-BASED:
-Generate 3-5 alerts that help users optimize energy:
-✓ "Weather will be cold on Dec 15-17, use heating devices only"
-✓ "Hot weather expected Dec 20-22, avoid heating appliances"
-✓ "Turn off TV when not in use - can save up to 10% monthly"
-✓ "Reduce freezer usage during peak hours (2pm-6pm)"
-✓ "Rainy days ahead - good time for indoor device maintenance"
-✗ DO NOT: Generic alerts like "Save energy" or "Be efficient"
+SMART TIPS GENERATION:
+For each plan, generate 3-5 device-specific smart tips that match the plan's focus:
+
+Cost Saver Plan - Money-saving tips:
+✓ "Turn off AC during cold weather (below 20°C) to save ₦X/month"
+✓ "Run water pump during off-peak hours (10pm-6am) to reduce electricity costs"
+✓ "Keep refrigerator at 3-4°C to optimize energy efficiency"
+✓ "Reduce freezer usage during peak hours (2pm-6pm) to avoid high rates"
+✓ "Use cold water for washing machine to eliminate heating costs"
+
+Eco Mode Plan - Environment-focused tips:
+✓ "Minimize AC use to reduce carbon emissions and HFC refrigerant leaks"
+✓ "Regular pump maintenance reduces energy waste and extends lifespan"
+✓ "Defrost refrigerator regularly to maintain efficiency and reduce power consumption"
+✓ "Run washing machine with full loads only to conserve water and energy"
+✓ "Use fans instead of AC when possible - they use 90% less energy"
+
+Comfort Balance Plan - Performance optimization tips:
+✓ "Set AC to 24°C for optimal comfort and efficiency"
+✓ "Schedule water pumping for consistent supply throughout the day"
+✓ "Avoid overloading refrigerator to ensure proper cooling"
+✓ "Maintain freezer at -18°C for optimal food preservation"
+✓ "Combine ceiling fans with AC for better air circulation and comfort"
+
+REQUIREMENTS:
+1. Match tips to devices in the plan only (Air Conditioner, Refrigerator, Washing Machine, Water Pump, Fan, Heater, etc.)
+2. Include specific numbers where relevant (temperatures, time windows, savings estimates)
+3. Tips should be actionable and practical
+4. Avoid tips for devices like TV, lights, and phone chargers (low impact)
+5. Each tip should be unique and relevant to the specific plan type's focus
+6. Tips array: "smartAlerts": ["tip1", "tip2", "tip3"]
+
+✗ DO NOT: Generate generic tips like "Save energy" or "Be efficient"
+✗ DO NOT: Include tips for devices not in the plan
 
 EXAMPLE for a HOT day (30°C, Sunny):
 - Cooling devices: MORE hours

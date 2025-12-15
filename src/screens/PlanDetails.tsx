@@ -389,25 +389,28 @@ export default function PlanDetails() {
                 </div>
 
                 <div>
-                    <h2 className="text-xs tracking-wide text-black/60 mb-3">SMART ALERTS</h2>
+                    <h2 className="text-xs tracking-wide text-black/60 mb-3">SMART TIPS</h2>
                     <div className="space-y-2">
-                        {plan.smartAlerts && plan.smartAlerts.length > 0 ? (
-                            plan.smartAlerts.slice(0, 3).map((alert: any, index: number) => (
-                                <motion.div
-                                    key={index}
-                                    className="bg-white/40 backdrop-blur-xl border border-white/60 rounded-2xl p-4 flex items-start gap-3 shadow-lg"
-                                    initial={{ opacity: 0, x: -10 }}
-                                    animate={{ opacity: 1, x: 0 }}
-                                    transition={{ delay: 0.35 + index * 0.05 }}
-                                >
-                                    <Bell className="w-4 h-4 mt-0.5 flex-shrink-0 text-black/60" strokeWidth={1.5} />
-                                    <span className="text-sm leading-relaxed">
-                                        {typeof alert === 'string' ? alert : alert.message || alert.text || JSON.stringify(alert)}
-                                    </span>
-                                </motion.div>
-                            ))
+                        {plan?.smartAlerts && plan.smartAlerts.length > 0 ? (
+                            plan.smartAlerts.map((tip: any, index: number) => {
+                                // Handle both string and object formats
+                                const tipText = typeof tip === 'string' ? tip : tip.alert || tip.tip || tip.message;
+
+                                return (
+                                    <motion.div
+                                        key={index}
+                                        className="bg-white/40 backdrop-blur-xl border border-white/60 rounded-2xl p-4 flex items-start gap-3 shadow-lg"
+                                        initial={{ opacity: 0, x: -10 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        transition={{ delay: 0.35 + index * 0.05 }}
+                                    >
+                                        <Bell className="w-4 h-4 mt-0.5 flex-shrink-0 text-black/60" strokeWidth={1.5} />
+                                        <span className="text-sm leading-relaxed">{tipText}</span>
+                                    </motion.div>
+                                );
+                            })
                         ) : (
-                            <p className="text-sm text-black/50">No alerts configured yet</p>
+                            <p className="text-sm text-black/50">No tips available yet</p>
                         )}
                     </div>
                 </div>

@@ -6,7 +6,7 @@ import AddDeviceModal from "../components/AddDeviceModal";
 import { getCurrentUserId, getCurrentUserProfile, updateUserProfile } from "../utils/storage";
 import { searchLocation, getWeatherData } from "../utils/location";
 import type { LocationSearchResult, LocationData } from "../utils/location";
-import { Plus, Wind, Droplets, Flame, Fan, CloudSun, Tv, Zap, X, MapPin, Bell } from "lucide-react";
+import { Plus, Wind, Droplets, Flame, Fan, CloudSun, Tv, Zap, X, MapPin, Bell, TrendingDown } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import NotificationCenter from "../components/NotificationCenter";
 import notificationService from "../services/notification.service";
@@ -34,6 +34,7 @@ export default function Dashboard() {
   // Long press and delete states
   const [longPressDevice, setLongPressDevice] = useState<any>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showDeletePlanModal, setShowDeletePlanModal] = useState(false);
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [showNotificationCenter, setShowNotificationCenter] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -43,6 +44,7 @@ export default function Dashboard() {
   const [isUpdatingLocation, setIsUpdatingLocation] = useState(false);
   const longPressTimer = useRef<NodeJS.Timeout | null>(null);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const planLongPressTimer = useRef<NodeJS.Timeout | null>(null);
 
   // User ID state for double-tap reveal
   const [showUserId, setShowUserId] = useState(false);
@@ -136,6 +138,49 @@ export default function Dashboard() {
     if (longPressTimer.current) {
       clearTimeout(longPressTimer.current);
       longPressTimer.current = null;
+    }
+  };
+
+  // Long press handlers for plan
+  const handlePlanPressStart = () => {
+    planLongPressTimer.current = setTimeout(() => {
+      setShowDeletePlanModal(true);
+    }, 500); // 500ms long press
+  };
+
+  const handlePlanPressEnd = () => {
+    if (planLongPressTimer.current) {
+      clearTimeout(planLongPressTimer.current);
+      planLongPressTimer.current = null;
+    }
+  };
+
+  // Handle plan click (navigate to plan details)
+  const handlePlanClick = () => {
+    if (!activePlan || !activePlan.id) {
+      navigate("/plans");
+      return;
+    }
+    navigate(`/plan/${activePlan.id}`);
+  };
+
+  // Delete active plan
+  const handleDeletePlan = () => {
+    if (!activePlan) return;
+
+    setIsDeleting(true);
+    try {
+      // Remove active plan from localStorage
+      localStorage.removeItem("activePlan");
+
+      // Update UI
+      setActivePlan(null);
+      setShowDeletePlanModal(false);
+    } catch (error) {
+      console.error("Failed to delete plan:", error);
+      alert("Failed to delete plan. Please try again.");
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -295,11 +340,17 @@ export default function Dashboard() {
         {/* Active Plan Card - Only show if user has an active plan */}
         {activePlan && (
           <motion.button
-            onClick={() => navigate("/plans")}
+            onClick={handlePlanClick}
+            onPointerDown={handlePlanPressStart}
+            onPointerUp={handlePlanPressEnd}
+            onPointerLeave={handlePlanPressEnd}
             className="w-full bg-white/40 backdrop-blur-xl border border-white/60 rounded-3xl p-6 hover:bg-white/50 transition-all shadow-lg text-left"
             whileTap={{ scale: 0.98 }}
+            animate={{
+              opacity: showDeletePlanModal ? 0.5 : 1,
+              scale: showDeletePlanModal ? 0.95 : 1,
+            }}
             initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
           >
             <div className="flex items-start justify-between mb-4">
@@ -586,6 +637,90 @@ export default function Dashboard() {
                         "Remove"
                       )}
                     </motion.button>
+                  </div>
+                </motion.div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* Delete Plan Modal */}
+      <AnimatePresence>
+        {showDeletePlanModal && activePlan && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              className="fixed inset-0 bg-black/20 z-40"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowDeletePlanModal(false)}
+            />
+
+            {/* Bottom Sheet Modal */}
+            <motion.div
+              className="fixed bottom-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-2xl rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.1)]"
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 30, stiffness: 300 }}
+            >
+              {/* Header */}
+              <div className="px-6 pt-6 pb-4">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-xl tracking-tight">Deactivate Plan</h2>
+                  <button
+                    onClick={() => setShowDeletePlanModal(false)}
+                    className="w-8 h-8 rounded-full border border-black/10 flex items-center justify-center hover:border-black/20 transition-colors"
+                  >
+                    <X className="w-4 h-4" strokeWidth={1.5} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Content */}
+              <div className="px-6 pb-6">
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="space-y-4"
+                >
+                  <p className="text-sm text-black/60">
+                    Are you sure you want to deactivate this plan?
+                  </p>
+
+                  {/* Plan Info Card */}
+                  <div className="bg-white/50 backdrop-blur-sm border border-white/60 rounded-2xl p-4 shadow-lg">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-white/50 backdrop-blur-sm border border-white/60 rounded-xl flex items-center justify-center">
+                        <TrendingDown className="w-5 h-5" strokeWidth={1.5} />
+                      </div>
+                      <div className="flex-1">
+                        <div className="text-sm font-medium mb-0.5">{activePlan.name}</div>
+                        <div className="text-xs text-black/50">
+                          Savings: {activePlan.savings}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="grid grid-cols-2 gap-3 pt-2">
+                    <button
+                      onClick={() => setShowDeletePlanModal(false)}
+                      className="py-3 px-4 bg-white/50 backdrop-blur-sm border border-white/60 rounded-xl text-sm hover:bg-white/60 transition-colors shadow-md"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleDeletePlan}
+                      disabled={isDeleting}
+                      className="py-3 px-4 bg-black text-white rounded-xl text-sm hover:bg-black/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed relative"
+                      style={{ zIndex: 9999 }}
+                    >
+                      {isDeleting ? "Deactivating..." : "Deactivate"}
+                    </button>
                   </div>
                 </motion.div>
               </div>
