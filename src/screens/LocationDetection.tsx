@@ -3,7 +3,7 @@ import { useNavigate } from "react-router";
 import { motion, AnimatePresence } from "motion/react";
 import { MapPin, AlertCircle, Search, X } from "lucide-react";
 import { detectLocation, searchLocation, getWeatherData, getLocationFromStorage, type LocationData, type LocationSearchResult } from "../utils/location";
-import { updateUserProfile } from "../utils/storage";
+import { updateUserLocation } from "../utils/user-storage";
 
 export default function LocationDetection() {
   const navigate = useNavigate();
@@ -116,17 +116,15 @@ export default function LocationDetection() {
   const handleContinue = () => {
     try {
       if (locationData) {
-        // Save location to localStorage
-        updateUserProfile({
-          location: {
-            city: locationData.city,
-            region: locationData.region,
-            country: locationData.country,
-            latitude: locationData.lat || 0,
-            longitude: locationData.lon || 0,
-            temperature: locationData.temperature,
-            weatherDescription: locationData.weatherDescription || "",
-          },
+        // Save location to new storage
+        updateUserLocation({
+          city: locationData.city,
+          region: locationData.region,
+          country: locationData.country,
+          latitude: locationData.lat || 0,
+          longitude: locationData.lon || 0,
+          temperature: locationData.temperature,
+          weatherDescription: locationData.weatherDescription || "",
         });
       }
 

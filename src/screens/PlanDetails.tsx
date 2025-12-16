@@ -7,6 +7,7 @@ import BottomNav from "../components/BottomNav";
 import notificationService from "../services/notification.service";
 import type { AIPlan } from "../types/ai-plan.types";
 import { getDeviceIcon } from "../utils/device-types";
+import { getUserData, getUserPlans, updateUserPlans } from "../utils/user-storage";
 
 // Helper function to get weather icon based on condition
 const getWeatherIcon = (condition: string) => {
@@ -41,17 +42,17 @@ export default function PlanDetails() {
     const [deviceNames, setDeviceNames] = useState<Record<string, any>>({});
     const [currencySymbol, setCurrencySymbol] = useState('$');
 
-    // Load AI plan and device names from localStorage
+
+    // Load AI plan and device names from new storage
     useEffect(() => {
         const loadPlan = () => {
             try {
-                const savedPlans = localStorage.getItem('aiGeneratedPlans');
-                if (!savedPlans) {
+                const plansData = getUserPlans();
+                if (!plansData) {
                     navigate('/ai-analysis');
                     return;
                 }
 
-                const plansData = JSON.parse(savedPlans);
                 let selectedPlan: AIPlan | null = null;
 
                 // Map ID to plan type
@@ -66,16 +67,11 @@ export default function PlanDetails() {
 
                 setPlan(selectedPlan);
 
-                // Load device names from users object
-                const usersStr = localStorage.getItem('users');
-                const userId = localStorage.getItem('currentUserId');
-
-                if (usersStr && userId) {
-                    const users = JSON.parse(usersStr);
-                    const userDevices = users[userId]?.devices || users[userId.trim()]?.devices; // Handle trailing space
-
+                // Load device names from new storage
+                const userData = getUserData();
+                if (userData?.devices) {
                     const devicesMap: Record<string, any> = {};
-                    userDevices?.forEach((device: any) => {
+                    userData.devices.forEach((device: any) => {
                         devicesMap[device.id] = {
                             name: device.customName || device.originalName || device.name,
                             type: device.deviceType || device.type,
@@ -88,10 +84,8 @@ export default function PlanDetails() {
                 }
 
                 // Load currency symbol
-                const energyData = localStorage.getItem('energyData');
-                if (energyData) {
-                    const data = JSON.parse(energyData);
-                    setCurrencySymbol(data.currencySymbol || '$');
+                if (userData?.energyCosts) {
+                    setCurrencySymbol(userData.energyCosts.currencySymbol || '$');
                 }
             } catch (error) {
                 console.error('Failed to load plan:', error);
@@ -185,15 +179,9 @@ export default function PlanDetails() {
             savings = metrics.budgetReductionPercentage || 0;
         }
 
-        // Save active plan to localStorage
-        const activePlan = {
-            id,
-            name: plan.name,
-            savings: `${currencySymbol}${savings.toFixed(2)} `,
-            status: "active",
-            type: plan.type,
-        };
-        localStorage.setItem("activePlan", JSON.stringify(activePlan));
+        // Save active plan to new storage
+        const activePlanType = plan.type === 'cost' ? 'cost' : plan.type === 'eco' ? 'eco' : 'balance';
+        updateUserPlans({ activePlan: activePlanType });
 
         // Send plan activation notification
         await notificationService.sendPlanSelectedNotification(

@@ -3,13 +3,14 @@ import type {
     NotificationSettings
 } from '../types/notification.types';
 import median from '../utils/median-bridge';
+import { getUserNotifications, addUserNotification, updateUserNotifications } from '../utils/user-storage';
 
 /**
  * Notification Service
  * Unified notification system for web and median.co native apps
  */
 class NotificationService {
-    private readonly STORAGE_KEY = 'kinesave_notifications';
+    // STORAGE_KEY removed - now using centralized storage
     private readonly SETTINGS_KEY = 'kinesave_notification_settings';
 
     /**
@@ -140,15 +141,10 @@ class NotificationService {
     }
 
     /**
-     * Save notification to localStorage
+     * Save notification to new storage
      */
     private saveNotification(notification: Notification): void {
-        const notifications = this.getAll();
-        notifications.unshift(notification); // Add to beginning
-
-        // Keep only last 50 notifications
-        const trimmed = notifications.slice(0, 50);
-        localStorage.setItem(this.STORAGE_KEY, JSON.stringify(trimmed));
+        addUserNotification(notification);
     }
 
     /**
@@ -169,11 +165,10 @@ class NotificationService {
     }
 
     /**
-     * Get all notifications
+     * Get all notifications from new storage
      */
     getAll(): Notification[] {
-        const data = localStorage.getItem(this.STORAGE_KEY);
-        return data ? JSON.parse(data) : [];
+        return getUserNotifications() || [];
     }
 
     /**
@@ -191,7 +186,7 @@ class NotificationService {
         const updated = notifications.map(n =>
             n.id === id ? { ...n, read: true } : n
         );
-        localStorage.setItem(this.STORAGE_KEY, JSON.stringify(updated));
+        updateUserNotifications(updated);
     }
 
     /**
@@ -200,7 +195,7 @@ class NotificationService {
     markAllAsRead(): void {
         const notifications = this.getAll();
         const updated = notifications.map(n => ({ ...n, read: true }));
-        localStorage.setItem(this.STORAGE_KEY, JSON.stringify(updated));
+        updateUserNotifications(updated);
     }
 
     /**
@@ -216,14 +211,14 @@ class NotificationService {
     delete(id: string): void {
         const notifications = this.getAll();
         const filtered = notifications.filter(n => n.id !== id);
-        localStorage.setItem(this.STORAGE_KEY, JSON.stringify(filtered));
+        updateUserNotifications(filtered);
     }
 
     /**
      * Clear all notifications
      */
     clearAll(): void {
-        localStorage.setItem(this.STORAGE_KEY, JSON.stringify([]));
+        updateUserNotifications([]);
     }
 
     /**

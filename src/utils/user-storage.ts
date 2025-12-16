@@ -73,10 +73,13 @@ export interface UserDevice {
 
 export interface UserNotification {
     id: string;
+    type: 'plan_selected' | 'daily_reminder' | 'device_tip' | 'usage_alert' | 'weather_advisory' | 'energy_saving';
     title: string;
     message: string;
     timestamp: string;
     read: boolean;
+    actionUrl?: string;
+    data?: any;
 }
 
 // ============================================
@@ -318,6 +321,21 @@ export function getUserLocation() {
 
 export function getUserEnergyCosts() {
     return getUserData()?.energyCosts || null;
+}
+
+/** Get all notifications */
+export function getUserNotifications(): UserNotification[] {
+    const userData = getUserData();
+    return userData?.notifications || [];
+}
+
+/** Update all notifications */
+export function updateUserNotifications(notifications: UserNotification[]): void {
+    const userData = getUserData();
+    if (!userData) return;
+
+    userData.notifications = notifications;
+    saveUserData(userData);
 }
 
 // ============================================

@@ -4,6 +4,7 @@ import { motion } from "motion/react";
 import { TrendingDown, Leaf, Gauge } from "lucide-react";
 import BottomNav from "../components/BottomNav";
 import type { AIPlan } from "../types/ai-plan.types";
+import { getUserData, getUserPlans } from "../utils/user-storage";
 
 const iconMap = {
   cost: TrendingDown,
@@ -20,27 +21,25 @@ export default function Plans() {
   const [notificationCount, setNotificationCount] = useState(0);
   const [currencySymbol, setCurrencySymbol] = useState('$');
 
-  // Load AI-generated plans from localStorage
+  // Load AI-generated plans from new storage
   useEffect(() => {
     const loadPlansAndCurrency = () => {
       try {
-        const savedPlans = localStorage.getItem('aiGeneratedPlans');
-        if (savedPlans) {
-          const plansData = JSON.parse(savedPlans);
+        const plansData = getUserPlans();
+        if (plansData) {
           setPlans([
             plansData.costSaver,
             plansData.ecoMode,
             plansData.comfortBalance,
-          ]);
+          ].filter(Boolean) as AIPlan[]); // Filter out null plans
         } else {
           setError('No plans generated yet. Please run analysis from the dashboard.');
         }
 
-        // Load currency symbol
-        const energyData = localStorage.getItem('energyData');
-        if (energyData) {
-          const data = JSON.parse(energyData);
-          setCurrencySymbol(data.currencySymbol || '$');
+        // Load currency symbol from user data
+        const userData = getUserData();
+        if (userData?.energyCosts) {
+          setCurrencySymbol(userData.energyCosts.currencySymbol || '$');
         }
       } catch (err) {
         console.error('Failed to load plans or currency:', err);

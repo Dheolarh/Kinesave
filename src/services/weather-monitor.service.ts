@@ -44,13 +44,13 @@ class WeatherMonitorService {
     private async checkWeather(): Promise<void> {
         try {
             const userData = getUserData();
-            if (!profile?.location) {
+            if (!userData?.location) {
                 console.log('No location set, skipping weather check');
                 return;
             }
 
-            // Get current weather from profile (updates happen via location service)
-            const currentWeather = profile.location;
+            // Get current weather from userData (updates happen via location service)
+            const currentWeather = userData.location;
 
             if (!this.lastWeather) {
                 // First check - just store the weather

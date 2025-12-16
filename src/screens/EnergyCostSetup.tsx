@@ -3,7 +3,7 @@ import { useNavigate } from "react-router";
 import { motion, AnimatePresence, useMotionValue, useTransform } from "motion/react";
 import { Trash2 } from "lucide-react";
 import AddDeviceModal from "../components/AddDeviceModal";
-import { updateUserProfile } from "../utils/storage";
+import { updateUserEnergyCosts, updateUserDevices } from "../utils/user-storage";
 import { getLocationFromStorage, type LocationData } from "../utils/location";
 import getSymbolFromCurrency from "currency-symbol-map";
 // @ts-ignore - Library doesn't have TypeScript types
@@ -30,7 +30,6 @@ export default function EnergyCostSetup() {
   const [monthlyCost, setMonthlyCost] = useState("");
   const [pricePerKwh, setPricePerKwh] = useState("");
   const [preferredBudget, setPreferredBudget] = useState("");
-  const [powerHoursPerDay, setPowerHoursPerDay] = useState(24); // Default 8 hours
   const [showDeviceModal, setShowDeviceModal] = useState(false);
   const [selectedDevices, setSelectedDevices] = useState<any[]>([]);
   const [locationData, setLocationData] = useState<LocationData | null>(null);
@@ -116,25 +115,21 @@ export default function EnergyCostSetup() {
     const price = parseFloat(pricePerKwh);
     const availableKwhPerMonth = monthlyPurchase / price;
 
-    // Prepare energy cost data
+    // Prepare energy cost data (removed powerHoursPerDay, availableKwhPerMonth)
     const energyData = {
       monthlyCost: parseFloat(monthlyCost),
       pricePerKwh: parseFloat(pricePerKwh),
       preferredBudget: preferredBudget ? parseFloat(preferredBudget) : null,
-      powerHoursPerDay: powerHoursPerDay,
-      availableKwhPerMonth: availableKwhPerMonth,
       currency: currency.code,
       currencySymbol: currency.symbol,
     };
 
-    // Prepare devices data
+    // Prepare devices data (removed brand, modelNumber - never used by AI)
     const devicesData = selectedDevices.map(device => ({
       id: device.id || `dev_${Date.now()}_${Math.random()}`,
       customName: device.customName || device.productName,
       originalName: device.productName,
       deviceType: device.deviceType,
-      brand: device.brand || "Unknown",
-      modelNumber: device.modelNumber || "N/A",
       wattage: device.energyStarSpecs?.powerRatingW || device.power || 0,
       priority: device.priority || 0,
       survey: device.survey || {
@@ -146,11 +141,9 @@ export default function EnergyCostSetup() {
     }));
 
     try {
-      // Save to localStorage
-      updateUserProfile({
-        energyCosts: energyData,
-        devices: devicesData,
-      });
+      // Save to new storage system
+      updateUserEnergyCosts(energyData);
+      updateUserDevices(devicesData);
 
       // Navigate to about user page
       navigate("/about-user");
@@ -300,34 +293,7 @@ export default function EnergyCostSetup() {
           )}
         </motion.div>
 
-        {/* Power Availability Input */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.225 }}
-        >
-          <label className="block text-xs text-black/60 mb-3 tracking-wide px-1">
-            AVERAGE POWER HOURS PER DAY
-          </label>
-          <input
-            type="number"
-            min="0"
-            max="24"
-            step="1"
-            value={powerHoursPerDay}
-            onChange={(e) => setPowerHoursPerDay(parseInt(e.target.value) || 0)}
-            onBlur={() => {
-              if (powerHoursPerDay < 0) setPowerHoursPerDay(0);
-              if (powerHoursPerDay > 24) setPowerHoursPerDay(24);
-            }}
-            placeholder=""
-            required
-            className="w-full px-4 py-4 bg-white/50 backdrop-blur-sm border border-white/60 rounded-2xl text-sm focus:outline-none focus:border-black/30 transition-colors shadow-lg"
-          />
-          <p className="text-xs text-black/40 mt-2 px-1" style={{ marginTop: "5px" }}>
-            How many hours per day do you have electricity?
-          </p>
-        </motion.div>
+        {/* Removed: Power Hours Per Day input (field not used by AI) */}
 
         {/* Devices Section */}
         <motion.div

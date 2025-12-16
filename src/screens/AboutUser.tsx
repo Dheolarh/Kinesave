@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router";
 import { motion } from "motion/react";
 import { ArrowLeft } from "lucide-react";
-import { updateUserProfile } from "../utils/storage";
+import { updateUserAbout } from "../utils/user-storage";
 
 export default function AboutUser() {
     const navigate = useNavigate();
@@ -16,12 +16,10 @@ export default function AboutUser() {
 
         try {
             // Save aboutUser data to localStorage
-            updateUserProfile({
-                aboutUser: {
-                    householdSize: parseInt(householdSize),
-                    occupationType,
-                    homeType,
-                },
+            updateUserAbout({
+                householdSize: parseInt(householdSize),
+                occupationType,
+                homeType,
             });
 
             // Profile complete, navigate to dashboard
