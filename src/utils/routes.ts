@@ -2,7 +2,7 @@ import { createBrowserRouter } from "react-router";
 import SplashScreen from "../screens/SplashScreen";
 import LocationDetection from "../screens/LocationDetection";
 import EnergyCostSetup from "../screens/EnergyCostSetup";
-import AboutUser from "../screens/AboutUser"; // NEW
+import AboutUser from "../screens/AboutUser";
 
 import Dashboard from "../screens/Dashboard";
 import DeviceDetails from "../screens/DeviceDetails";
