@@ -51,19 +51,61 @@ class AIPlanService {
         try {
             console.log('🚀 Starting AI plan generation for', deviceIds.length, 'devices');
 
-            // TODO: Wire up new plan classes here
-            // const preData = new PreAnalysisData();
-            // await preData.fetchAll(deviceIds);
-            // const plans = await Promise.all([...]);
+            // Step 1: Prepare data using PreAnalysisData
+            const { PreAnalysisData } = await import('./pre-analysis-data');
+            const preData = new PreAnalysisData();
+            await preData.fetchAll(deviceIds);
 
-            throw new Error('New AI logic not yet wired up. Implementation pending.');
+            console.log('✅ Pre-analysis data prepared');
+
+            // Step 2: Generate all 3 plans in parallel
+            const { CostSaverPlan } = await import('./plans/cost-saver-plan');
+            const { EcoModePlan } = await import('./plans/eco-mode-plan');
+            const { ComfortBalancePlan } = await import('./plans/comfort-balance-plan');
+
+            const costSaverGenerator = new CostSaverPlan();
+            const ecoModeGenerator = new EcoModePlan();
+            const comfortBalanceGenerator = new ComfortBalancePlan();
+
+            console.log('⏳ Generating 3 plans...');
+
+            const [costSaver, ecoMode, comfortBalance] = await Promise.all([
+                costSaverGenerator.generate(preData),
+                ecoModeGenerator.generate(preData),
+                comfortBalanceGenerator.generate(preData)
+            ]);
+
+            console.log('✅ All 3 plans generated successfully');
+
+            // Step 3: Save to storage
+            const { updateUserPlans } = await import('../utils/user-storage');
+            const now = new Date();
+            const validUntil = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // 30 days
+
+            updateUserPlans({
+                costSaver,
+                ecoMode,
+                comfortBalance
+            });
+
+            console.log('✅ Plans saved to user storage');
+
+            // Mark analysis as completed
+            this.markAnalysisCompleted();
+
+            return {
+                costSaver,
+                ecoMode,
+                comfortBalance,
+                generatedAt: now.toISOString(),
+                validUntil: validUntil.toISOString(),
+                analysisDays: 30,
+                weatherSource: 'hybrid'
+            };
 
         } catch (error: any) {
             console.error('AI plan generation failed:', error);
             throw new Error(`Failed to generate AI plans: ${error.message}`);
-        } finally {
-            // Mark analysis as completed
-            this.markAnalysisCompleted();
         }
     }
 

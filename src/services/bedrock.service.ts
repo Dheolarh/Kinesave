@@ -46,7 +46,7 @@ export class BedrockService {
         try {
             const requestBody = {
                 anthropic_version: 'bedrock-2023-05-31',
-                max_tokens: 8192, // Claude 3 Sonnet max output
+                max_tokens: 8192, // Increased for 30-day plan responses
                 temperature: 0.7,
                 messages: [
                     {

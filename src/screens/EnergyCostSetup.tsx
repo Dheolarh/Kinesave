@@ -3,7 +3,8 @@ import { useNavigate } from "react-router";
 import { motion, AnimatePresence, useMotionValue, useTransform } from "motion/react";
 import { Trash2 } from "lucide-react";
 import AddDeviceModal from "../components/AddDeviceModal";
-import { updateUserEnergyCosts, updateUserDevices } from "../utils/user-storage";
+import { getUserData, updateUserEnergyCosts, updateUserDevices } from "../utils/user-storage";
+import { generateDeviceId } from "../utils/device-id";
 import { getLocationFromStorage, type LocationData } from "../utils/location";
 import getSymbolFromCurrency from "currency-symbol-map";
 // @ts-ignore - Library doesn't have TypeScript types
@@ -19,7 +20,7 @@ const getCurrencyForCountry = (countryName: string): { symbol: string; code: str
       return { symbol, code };
     }
   } catch (error) {
-    console.log(`Currency mapping not found for ${countryName}, using USD`);
+    console.log(`Currency mapping not found for ${ countryName }, using USD`);
   }
   // Default to USD if not found
   return { symbol: "$", code: "USD" };
@@ -51,7 +52,7 @@ export default function EnergyCostSetup() {
     : { symbol: "$", code: "USD" };
 
   const locationDisplay = locationData
-    ? `${locationData.city}${locationData.region ? `, ${locationData.region}` : ""}`
+    ? `${ locationData.city }${ locationData.region ? `, ${locationData.region}` : "" } `
     : "Unknown Location";
 
   // Load saved data on mount
@@ -125,20 +126,26 @@ export default function EnergyCostSetup() {
     };
 
     // Prepare devices data (removed brand, modelNumber - never used by AI)
-    const devicesData = selectedDevices.map(device => ({
-      id: device.id || `dev_${Date.now()}_${Math.random()}`,
-      customName: device.customName || device.productName,
-      originalName: device.productName,
-      deviceType: device.deviceType,
-      wattage: device.energyStarSpecs?.powerRatingW || device.power || 0,
-      priority: device.priority || 0,
-      survey: device.survey || {
-        frequency: "daily",
-        hoursPerDay: 0,
-        usageTimes: [],
-        room: device.room || "Unassigned",
-      },
-    }));
+    const existingIds: string[] = [];
+    const devicesData = selectedDevices.map(device => {
+      const deviceId = device.id || generateDeviceId(device.customName || device.productName, existingIds);
+      existingIds.push(deviceId); // Track to avoid duplicates
+      
+      return {
+        id: deviceId,
+        customName: device.customName || device.productName,
+        originalName: device.productName,
+        deviceType: device.deviceType,
+        wattage: device.energyStarSpecs?.powerRatingW || device.additionalSpecs?.powerRatingW || device.power || 0,
+        priority: device.priority || 0,
+        survey: device.survey || {
+          frequency: "daily",
+          hoursPerDay: 0,
+          usageTimes: [],
+          room: device.room || "Unassigned",
+        },
+      };
+    });
 
     try {
       // Save to new storage system
@@ -339,7 +346,7 @@ export default function EnergyCostSetup() {
           transition={{ delay: 0.3 }}
           whileTap={{ scale: 0.98 }}
         >
-          {selectedDevices.length === 0 ? "Scan Available Devices" : `Scan More Devices (${selectedDevices.length} added)`}
+          {selectedDevices.length === 0 ? "Scan Available Devices" : `Scan More Devices(${ selectedDevices.length } added)`}
         </motion.button>
 
         {selectedDevices.length > 0 && (
@@ -399,7 +406,7 @@ function SwipeableDeviceItem({ device, onRemove }: { device: any, onRemove: () =
       <div className="bg-white/50 backdrop-blur-sm border border-white/60 rounded-2xl p-4 flex items-center justify-between relative z-10">
         <div>
           <p className="text-sm">{device.customName || device.name}</p>
-          <p className="text-xs text-black/50">{device.customName ? device.name : `${device.power}W`}</p>
+          <p className="text-xs text-black/50">{device.customName ? device.name : `${ device.power } W`}</p>
         </div>
         <div className="w-2 h-2 bg-green-500 rounded-full" />
       </div>

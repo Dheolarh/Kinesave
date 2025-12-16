@@ -107,23 +107,23 @@ export default function PlanDetails() {
         if (plan.type === 'cost') {
             return {
                 label1: "Monthly Savings",
-                value1: `${currencySymbol}${metrics.monthlySaving || 0} `,
+                value1: `${currencySymbol}${Math.trunc(metrics.monthlySaving || 0)} `,
                 label2: "Efficiency Gain",
-                value2: `${Math.round((metrics.monthlySaving / (metrics.initialBudget || 1)) * 100)}% `
+                value2: `${Math.trunc((metrics.monthlySaving / (metrics.initialBudget || 1)) * 100)}% `
             };
         } else if (plan.type === 'eco') {
             return {
                 label1: "Eco Gain",
-                value1: `+ ${metrics.ecoImprovementPercentage || 0}% `,
+                value1: `+ ${Math.trunc(metrics.ecoImprovementPercentage || 0)}% `,
                 label2: "Monthly Cost Cap",
-                value2: `${currencySymbol}${metrics.monthlyCostCap || 0} `
+                value2: `${currencySymbol}${Math.trunc(metrics.monthlyCostCap || 0)} `
             };
         } else {
             return {
                 label1: "Budget Reduction",
-                value1: `${metrics.budgetReductionPercentage || 0}% `,
+                value1: `${Math.trunc(metrics.budgetReductionPercentage || 0)}% `,
                 label2: "Eco Gain",
-                value2: `+ ${metrics.ecoFriendlyGainPercentage || 0}% `
+                value2: `+ ${Math.trunc(metrics.ecoFriendlyGainPercentage || 0)}% `
             };
         }
     };
@@ -322,45 +322,51 @@ export default function PlanDetails() {
                                     whileTap={{ scale: 0.97 }}
                                     className="flex items-center justify-between gap-3 p-4 rounded-2xl bg-white/50 border border-white/60 shadow-lg"
                                 >
-                                    <div className="flex items-center gap-3 flex-1 min-w-0">
-                                        <div className="w-10 h-10 bg-white/50 backdrop-blur-sm border border-white/60 rounded-xl flex items-center justify-center flex-shrink-0">
-                                            {(() => {
-                                                const deviceType = deviceNames[deviceId]?.type || '';
-                                                const DeviceIcon = getDeviceIcon(deviceType);
-                                                return <DeviceIcon className="w-5 h-5" strokeWidth={1.5} />;
-                                            })()}
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <div className="text-sm font-medium truncate">
-                                                {(() => {
-                                                    console.log('Looking for deviceId:', deviceId);
-                                                    console.log('Available devices:', Object.keys(deviceNames));
+                                    {(() => {
+                                        // Helper to find matching device key (simplified for clean IDs)
+                                        const findDeviceMatch = (id: string) => {
+                                            const cleanId = id.trim();
 
-                                                    // Try exact match first
-                                                    if (deviceNames[deviceId]?.name) {
-                                                        return deviceNames[deviceId].name;
-                                                    }
+                                            // Try exact match
+                                            if (deviceNames[cleanId]) return cleanId;
 
-                                                    // Try fuzzy match (AI might have modified the ID)
-                                                    const fuzzyMatch = Object.keys(deviceNames).find(key =>
-                                                        deviceId.includes(key) || key.includes(deviceId.split('_')[0])
-                                                    );
+                                            // Try trimmed keys match (for backward compatibility with old IDs)
+                                            const trimmedMatch = Object.keys(deviceNames).find(key => key.trim() === cleanId);
+                                            if (trimmedMatch) return trimmedMatch;
 
-                                                    if (fuzzyMatch && deviceNames[fuzzyMatch]?.name) {
-                                                        console.log('Fuzzy matched:', fuzzyMatch, '->', deviceNames[fuzzyMatch].name);
-                                                        return deviceNames[fuzzyMatch].name;
-                                                    }
+                                            // Fallback: return cleanId even if not found
+                                            console.warn('Device not found:', cleanId);
+                                            return cleanId;
+                                        };
 
-                                                    console.warn('No match found for:', deviceId);
-                                                    return deviceId;
-                                                })()}
-                                            </div>
-                                            {deviceNames[deviceId]?.wattage && (
-                                                <div className="text-xs text-black/50">{deviceNames[deviceId].wattage}W</div>
-                                            )}
-                                        </div>
-                                    </div>
+                                        const matchedKey = findDeviceMatch(deviceId);
+                                        const device = deviceNames[matchedKey];
+                                        const deviceType = device?.type || '';
+                                        const DeviceIcon = getDeviceIcon(deviceType);
 
+                                        return (
+                                            <>
+                                                <div className="flex items-center gap-3 flex-1 min-w-0">
+                                                    <div className="w-10 h-10 bg-white/50 backdrop-blur-sm border border-white/60 rounded-xl flex items-center justify-center flex-shrink-0">
+                                                        <DeviceIcon className="w-5 h-5" strokeWidth={1.5} />
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="text-sm font-medium truncate">
+                                                            {device?.name || matchedKey}
+                                                        </div>
+                                                        {device?.wattage && (
+                                                            <div className="text-xs text-black/50">{device.wattage}W</div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                <div className="text-xs text-black/60">
+                                                    <span className="inline-block px-2.5 py-1 rounded-full bg-black/5">
+                                                        {device?.hoursPerDay || 0}h/day
+                                                    </span>
+                                                </div>
+                                            </>
+                                        );
+                                    })()}
                                 </motion.div>
                             ))
                         ) : (

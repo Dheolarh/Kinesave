@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from "motion/react";
 import { X, Wind, Droplets, Flame, Fan, Search, Check, Zap, Tv, PlusCircle } from "lucide-react";
 import energyStarService, { type DeviceSpec } from "../services/energy-star.service";
 import { getDeviceType, getDeviceIcon } from "../utils/device-types";
+import { generateDeviceId } from "../utils/device-id";
+import { getUserData } from "../utils/user-storage";
 import DevicesModal from "./DevicesModal";
 
 
@@ -125,10 +127,32 @@ export default function AddDeviceModal({ isOpen, onClose, onAdd }: AddDeviceModa
     if (!selectedDevice || !frequency || !hoursPerDay || usageTimes.length === 0 || !customName.trim() || !priority) return;
 
     setIsSubmittingSurvey(true);
+    setError(null);
+
     try {
+      // Get existing devices to check for duplicate names
+      const userData = getUserData();
+      const existingDevices = userData?.devices || [];
+
+      // Check if a device with this name already exists
+      const trimmedName = customName.trim().toLowerCase();
+      const duplicateName = existingDevices.some(
+        (device: any) => device.customName?.toLowerCase() === trimmedName
+      );
+
+      if (duplicateName) {
+        setError(`A device named "${customName.trim()}" already exists. Please use a different name.`);
+        setIsSubmittingSurvey(false);
+        return;
+      }
+
+      // Get existing IDs to ensure uniqueness
+      const existingIds = existingDevices.map((d: any) => d.id);
+      const deviceId = generateDeviceId(customName.trim(), existingIds);
+
       // Create device object with survey data
       const deviceData = {
-        id: `dev_${Date.now()}_${Math.random()} `,
+        id: deviceId,
         customName: customName.trim(),
         originalName: selectedDevice.productName,
         deviceType: deviceType || selectedDevice.category,
@@ -675,21 +699,30 @@ export default function AddDeviceModal({ isOpen, onClose, onAdd }: AddDeviceModa
                     </motion.div>
                   </div>
 
-                  <div className="px-6 py-4 flex-shrink-0 flex gap-3">
-                    <button
-                      onClick={() => setStage(previousStage || "results")}
-                      className="flex-1 py-3.5 bg-white/60 backdrop-blur-xl border border-white/60 text-black rounded-full text-sm tracking-wide hover:bg-white/70 transition-colors"
-                    >
-                      Back
-                    </button>
-                    <motion.button
-                      onClick={handleCompleteSurvey}
-                      disabled={!isSurveyValid || isSubmittingSurvey}
-                      className="flex-1 bg-black text-white py-3.5 rounded-full text-sm tracking-wide hover:bg-black/90 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                      whileTap={{ scale: 0.98 }}
-                    >
-                      {isSubmittingSurvey ? "Adding..." : "Add Device"}
-                    </motion.button>
+                  <div className="px-6 flex-shrink-0">
+                    {/* Error Message */}
+                    {error && (
+                      <div className="mb-4 text-sm text-red-500 bg-red-50 px-4 py-3 rounded-xl border border-red-100">
+                        {error}
+                      </div>
+                    )}
+
+                    <div className="py-4 flex gap-3">
+                      <button
+                        onClick={() => setStage(previousStage || "results")}
+                        className="flex-1 py-3.5 bg-white/60 backdrop-blur-xl border border-white/60 text-black rounded-full text-sm tracking-wide hover:bg-white/70 transition-colors"
+                      >
+                        Back
+                      </button>
+                      <motion.button
+                        onClick={handleCompleteSurvey}
+                        disabled={!isSurveyValid || isSubmittingSurvey}
+                        className="flex-1 bg-black text-white py-3.5 rounded-full text-sm tracking-wide hover:bg-black/90 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                        whileTap={{ scale: 0.98 }}
+                      >
+                        {isSubmittingSurvey ? "Adding..." : "Add Device"}
+                      </motion.button>
+                    </div>
                   </div>
                 </>
               )}
