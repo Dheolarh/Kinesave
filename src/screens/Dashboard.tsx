@@ -3,25 +3,15 @@ import { useNavigate } from "react-router";
 import BottomNav from "../components/BottomNav";
 import FloatingAIRing from "../components/FloatingAIRing";
 import AddDeviceModal from "../components/AddDeviceModal";
-import { getCurrentUserId, getCurrentUserProfile, updateUserProfile } from "../utils/storage";
+import { getCurrentUserId, getUserData, updateUserDevices, updateUserLocation } from "../utils/user-storage";
 import { searchLocation, getWeatherData } from "../utils/location";
-import type { LocationSearchResult, LocationData } from "../utils/location";
-import { Plus, Wind, Droplets, Flame, Fan, CloudSun, Tv, Zap, X, MapPin, Bell, TrendingDown } from "lucide-react";
+import type { LocationSearchResult } from "../utils/location";
+import { Plus, CloudSun, X, MapPin, Bell, TrendingDown } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import NotificationCenter from "../components/NotificationCenter";
 import notificationService from "../services/notification.service";
+import { getDeviceIcon } from "../utils/device-types";
 
-const iconMap = {
-  ac: Wind,
-  air_conditioner: Wind,
-  dehumidifier: Droplets,
-  refrigerator: Droplets,
-  heater: Flame,
-  fan: Fan,
-  tv: Tv,
-  washing_machine: Fan,
-  led_bulb: Zap,
-};
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -69,27 +59,57 @@ export default function Dashboard() {
     loadUnreadCount(); // Refresh count when closing
   };
 
+  // Helper function to check if device is in active plan
+  const isDeviceInActivePlan = (deviceId: string): boolean => {
+    try {
+      const savedPlan = localStorage.getItem("activePlan");
+      if (!savedPlan) return false;
+
+      const plan = JSON.parse(savedPlan);
+
+      // Get the full plan details from aiGeneratedPlans
+      const savedPlans = localStorage.getItem('aiGeneratedPlans');
+      if (!savedPlans) return false;
+
+      const plansData = JSON.parse(savedPlans);
+      let fullPlan = null;
+
+      // Map plan ID to full plan data
+      if (plan.id === '1') fullPlan = plansData.costSaver;
+      else if (plan.id === '2') fullPlan = plansData.ecoMode;
+      else if (plan.id === '3') fullPlan = plansData.comfortBalance;
+
+      if (!fullPlan || !fullPlan.devices) return false;
+
+      // Check if device ID is in the plan's devices array
+      return fullPlan.devices.includes(deviceId);
+    } catch (error) {
+      console.error("Error checking device in active plan:", error);
+      return false;
+    }
+  };
+
   const loadData = () => {
     try {
       setLoading(true);
 
       // Load complete user profile from localStorage
-      const profile = getCurrentUserProfile();
+      const userData = getUserData();
 
-      if (!profile) {
+      if (!userData) {
         console.error("No user profile found");
         setLoading(false);
         return;
       }
 
       // Set location
-      if (profile.location) {
-        setLocation(profile.location);
+      if (userData.location) {
+        setLocation(userData.location);
       }
 
       // Set devices  
-      if (profile.devices) {
-        setDevices(profile.devices);
+      if (userData.devices) {
+        setDevices(userData.devices);
       }
 
       // Load active plan (still from localStorage for now)
@@ -107,14 +127,14 @@ export default function Dashboard() {
   const handleAddDevice = (device: any) => {
     try {
       // Get current profile
-      const profile = getCurrentUserProfile();
+      const userData = getUserData();
 
-      if (profile) {
+      if (userData) {
         // Add new device to existing devices
-        const updatedDevices = [...(profile.devices || []), device];
+        const updatedDevices = [...(userData.devices || []), device];
 
         // Save to localStorage
-        updateUserProfile({ devices: updatedDevices });
+        updateUserDevices(updatedDevices);
 
         // Reload dashboard to show new device
         loadData();
@@ -191,14 +211,14 @@ export default function Dashboard() {
     setIsDeleting(true);
     try {
       // Delete from localStorage
-      const profile = getCurrentUserProfile();
+      const userData = getUserData();
 
-      if (profile) {
+      if (userData) {
         // Remove device from array
-        const updatedDevices = profile.devices.filter((d: any) => d.id !== longPressDevice.id);
+        const updatedDevices = userData.devices.filter((d: any) => d.id !== longPressDevice.id);
 
         // Save back to localStorage
-        updateUserProfile({ devices: updatedDevices });
+        updateUserDevices(updatedDevices);
 
         // Update UI
         setDevices(updatedDevices);
@@ -261,7 +281,7 @@ export default function Dashboard() {
       };
 
       // Update location in localStorage
-      updateUserProfile({ location: newLocationData });
+      updateUserLocation(newLocationData);
 
       // Update local state
       setLocation(newLocationData);
@@ -338,34 +358,110 @@ export default function Dashboard() {
 
       <div className="px-5 space-y-4">
         {/* Active Plan Card - Only show if user has an active plan */}
-        {activePlan && (
-          <motion.button
-            onClick={handlePlanClick}
-            onPointerDown={handlePlanPressStart}
-            onPointerUp={handlePlanPressEnd}
-            onPointerLeave={handlePlanPressEnd}
-            className="w-full bg-white/40 backdrop-blur-xl border border-white/60 rounded-3xl p-6 hover:bg-white/50 transition-all shadow-lg text-left"
-            whileTap={{ scale: 0.98 }}
-            animate={{
-              opacity: showDeletePlanModal ? 0.5 : 1,
-              scale: showDeletePlanModal ? 0.95 : 1,
-            }}
-            initial={{ opacity: 0, y: 10 }}
-            transition={{ delay: 0.1 }}
-          >
-            <div className="flex items-start justify-between mb-4">
-              <div>
-                <div className="text-xs tracking-wide text-black/60 mb-2">ACTIVE PLAN</div>
-                <h3 className="text-lg tracking-tight mb-1">{activePlan.name}</h3>
-                <p className="text-xs text-black/60">Monthly savings: {activePlan.savings}</p>
+        {activePlan && (() => {
+          // Get full plan data to access metrics
+          const savedPlans = localStorage.getItem('aiGeneratedPlans');
+          let fullPlan = null;
+          let currencySymbol = '$';
+
+          if (savedPlans) {
+            try {
+              const plansData = JSON.parse(savedPlans);
+              if (activePlan.id === '1') fullPlan = plansData.costSaver;
+              else if (activePlan.id === '2') fullPlan = plansData.ecoMode;
+              else if (activePlan.id === '3') fullPlan = plansData.comfortBalance;
+
+              // Get currency symbol
+              const energyData = localStorage.getItem('energyData');
+              if (energyData) {
+                const data = JSON.parse(energyData);
+                currencySymbol = data.currencySymbol || '$';
+              }
+            } catch (error) {
+              console.error('Error loading plan details:', error);
+            }
+          }
+
+          return (
+            <motion.button
+              onClick={handlePlanClick}
+              onPointerDown={handlePlanPressStart}
+              onPointerUp={handlePlanPressEnd}
+              onPointerLeave={handlePlanPressEnd}
+              className="w-full bg-white/40 backdrop-blur-xl border border-white/60 rounded-3xl p-6 hover:bg-white/50 transition-all shadow-lg text-left"
+              whileTap={{ scale: 0.98 }}
+              animate={{
+                opacity: showDeletePlanModal ? 0.5 : 1,
+                scale: showDeletePlanModal ? 0.95 : 1,
+              }}
+              initial={{ opacity: 0, y: 10 }}
+              transition={{ delay: 0.1 }}
+            >
+              <div className="flex items-start justify-between mb-4">
+                <div>
+                  <div className="text-xs tracking-wide text-black/60 mb-2">ACTIVE PLAN</div>
+                  <h3 className="text-lg tracking-tight mb-1">{activePlan.name}</h3>
+
+                  {/* Plan-specific metrics */}
+                  <div className="flex gap-6 mt-3">
+                    {fullPlan?.type === 'cost' && (
+                      <>
+                        <div>
+                          <p className="text-xs text-black/50 mb-1">Initial Budget</p>
+                          <p className="text-sm tracking-tight">{currencySymbol}{fullPlan.metrics.initialBudget || 0}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-black/50 mb-1">Optimized Budget</p>
+                          <p className="text-sm tracking-tight text-green-600">
+                            {currencySymbol}{fullPlan.metrics.optimizedBudget || 0}
+                          </p>
+                        </div>
+                      </>
+                    )}
+
+                    {fullPlan?.type === 'eco' && (
+                      <>
+                        <div>
+                          <p className="text-xs text-black/50 mb-1">Eco Gain</p>
+                          <p className="text-sm tracking-tight text-green-600">
+                            +{fullPlan.metrics.ecoImprovementPercentage || 0}%
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-black/50 mb-1">Monthly Cost Cap</p>
+                          <p className="text-sm tracking-tight">
+                            {currencySymbol}{fullPlan.metrics.monthlyCostCap || 0}
+                          </p>
+                        </div>
+                      </>
+                    )}
+
+                    {fullPlan?.type === 'balance' && (
+                      <>
+                        <div>
+                          <p className="text-xs text-black/50 mb-1">Budget Reduction</p>
+                          <p className="text-sm tracking-tight">
+                            -{fullPlan.metrics.budgetReductionPercentage || 0}%
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-black/50 mb-1">Eco Gain</p>
+                          <p className="text-sm tracking-tight text-green-600">
+                            +{fullPlan.metrics.ecoFriendlyGainPercentage || 0}%
+                          </p>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+                <div className="w-2.5 h-2.5 rounded-full bg-green-500" />
               </div>
-              <div className="w-2.5 h-2.5 rounded-full bg-green-500" />
-            </div>
-            <div className="pt-3 border-t border-white/40 text-xs text-black/60">
-              Tap to view or change plan
-            </div>
-          </motion.button>
-        )}
+              <div className="pt-3 border-t border-white/40 text-xs text-black/60">
+                Tap to view or change plan
+              </div>
+            </motion.button>
+          );
+        })()}
 
         {/* Device Grid */}
         <div className="grid grid-cols-2 gap-3">
@@ -386,7 +482,8 @@ export default function Dashboard() {
 
           {/* Device Cards */}
           {devices.map((device, index) => {
-            const Icon = iconMap[device.deviceType as keyof typeof iconMap] || iconMap[device.type as keyof typeof iconMap] || Zap;
+            const Icon = getDeviceIcon(device.deviceType || device.type);
+            const isActive = isDeviceInActivePlan(device.id);
             return (
               <motion.button
                 key={device.id}
@@ -404,7 +501,7 @@ export default function Dashboard() {
                 transition={{ delay: 0.2 + (index + 1) * 0.05 }}
               >
                 <div
-                  className={`absolute top-3 right-3 w-2 h-2 rounded-full ${device.status === "active" ? "bg-green-500" : "bg-black/20"}`}
+                  className={`absolute top-3 right-3 w-2 h-2 rounded-full ${isActive ? "bg-green-500" : "bg-black/20"}`}
                 />
                 <div className="w-12 h-12 bg-white/50 backdrop-blur-sm border border-white/60 rounded-2xl flex items-center justify-center">
                   <Icon className="w-6 h-6" strokeWidth={1.5} />

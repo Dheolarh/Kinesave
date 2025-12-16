@@ -3,10 +3,10 @@ import { useNavigate } from "react-router";
 import { motion } from "motion/react";
 import {
   getCurrentUserId,
-  getCurrentUserProfile,
+  getUserData,
   createUserProfile,
   getProfileCompletionStatus
-} from "../utils/storage";
+} from "../utils/user-storage";
 
 export default function SplashScreen() {
   const navigate = useNavigate();
@@ -24,15 +24,15 @@ export default function SplashScreen() {
       }
 
       // User exists - load profile and route
-      const profile = getCurrentUserProfile();
-      if (!profile) {
+      const userData = getUserData();
+      if (!userData) {
         // Corrupt data - clear and start fresh
         localStorage.removeItem('currentUserId');
         return;
       }
 
       // Route based on completion
-      routeUserBasedOnProfile(profile);
+      routeUserBasedOnProfile(userData);
     };
 
     checkExistingUser();
@@ -108,16 +108,6 @@ export default function SplashScreen() {
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.8, ease: "easeOut" }}
       >
-        <motion.h1
-          className="text-4xl tracking-tight mb-4 font-semibold"
-          style={{ color: "#000" }}
-          initial={{ letterSpacing: "-0.05em" }}
-          animate={{ letterSpacing: "0em" }}
-          transition={{ duration: 1.2, ease: "easeInOut" }}
-        >
-          KineSave
-        </motion.h1>
-
         {/* Name Input */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}

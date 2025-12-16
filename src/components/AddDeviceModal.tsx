@@ -335,7 +335,7 @@ export default function AddDeviceModal({ isOpen, onClose, onAdd }: AddDeviceModa
                           <motion.button
                             key={index}
                             onClick={() => handleSelectDevice(device)}
-                            className={`w - full text - left p - 4 rounded - 2xl shadow - lg hover: shadow - xl transition - all ${isSelected
+                            className={`w-full text-left p-4 rounded-2xl shadow-lg hover: shadow-xl transition-all ${isSelected
                               ? "bg-white/80"
                               : "bg-white/40"
                               } `}
@@ -517,7 +517,7 @@ export default function AddDeviceModal({ isOpen, onClose, onAdd }: AddDeviceModa
                     >
                       {/* Device Name */}
                       <div>
-                        <label className="block text-xs text-black/60 pt-6 mb-2 tracking-wide">
+                        <label className="block text-xs text-black/60 pt-4 mb-2 tracking-wide">
                           Device Name <span className="text-red-500">*</span>
                         </label>
                         <input
@@ -539,7 +539,7 @@ export default function AddDeviceModal({ isOpen, onClose, onAdd }: AddDeviceModa
                             <button
                               key={option.value}
                               onClick={() => setFrequency(option.value)}
-                              className={`p - 3 rounded - xl text - xs shadow - lg hover: shadow - xl transition - all border ${frequency === option.value
+                              className={`p-3 rounded-xl text-xs shadow-lg hover:shadow-xl transition-all border ${frequency === option.value
                                 ? "bg-black text-white border-black"
                                 : "bg-white/40 border-white/60 hover:bg-white/50"
                                 } `}
@@ -585,7 +585,7 @@ export default function AddDeviceModal({ isOpen, onClose, onAdd }: AddDeviceModa
                               <button
                                 key={option.value}
                                 onClick={() => toggleUsageTime(option.value)}
-                                className={`p - 3 rounded - xl text - xs flex items - center justify - between shadow - lg hover: shadow - xl transition - all border ${isSelected
+                                className={`p-3 rounded-xl text-xs flex items-center justify-between shadow-lg hover:shadow-xl transition-all border ${isSelected
                                   ? "bg-black text-white border-black"
                                   : "bg-white/40 border-white/60 hover:bg-white/50"
                                   } `}
@@ -608,7 +608,7 @@ export default function AddDeviceModal({ isOpen, onClose, onAdd }: AddDeviceModa
                             <button
                               key={option.value}
                               onClick={() => setRoom(option.value)}
-                              className={`p - 3 rounded - xl text - xs shadow - lg hover: shadow - xl transition - all border ${room === option.value
+                              className={`p-3 rounded-xl text-xs shadow-lg hover:shadow-xl transition-all border ${room === option.value
                                 ? "bg-black text-white border-black"
                                 : "bg-white/40 border-white/60 hover:bg-white/50"
                                 } `}

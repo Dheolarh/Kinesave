@@ -68,6 +68,9 @@ class NotificationService {
         // Save to localStorage
         this.saveNotification(notification);
 
+        // Trigger toast notification
+        this.triggerToast(notification);
+
         // Send native push if in median.co app
         if (this.isMedianApp()) {
             await this.sendMedianPush(notification);
@@ -75,6 +78,19 @@ class NotificationService {
             // Web browser notification
             await this.sendBrowserNotification(notification);
         }
+    }
+
+    /**
+     * Trigger toast notification (custom UI toast)
+     */
+    private triggerToast(notification: Notification): void {
+        // Dispatch custom event for toast
+        window.dispatchEvent(new CustomEvent('show-toast', {
+            detail: {
+                title: notification.title,
+                message: notification.message
+            }
+        }));
     }
 
     /**
@@ -217,7 +233,7 @@ class NotificationService {
         await this.send({
             id: `plan_${Date.now()} `,
             type: 'plan_selected',
-            title: '✅ Plan Activated!',
+            title: 'Plan Activated',
             message: `${planName} is now your active energy plan${savings ? `. Save up to $${savings}/month!` : ''} `,
             timestamp: new Date().toISOString(),
             read: false,

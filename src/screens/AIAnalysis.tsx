@@ -1,21 +1,10 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { motion } from "motion/react";
-import { Check, Wind, Droplets, Flame, Fan, ArrowLeft, Tv, Zap } from "lucide-react";
+import { Check, ArrowLeft } from "lucide-react";
 import Orb from "../components/Orb";
-import { getCurrentUserProfile } from "../utils/storage";
-
-const iconMap = {
-  ac: Wind,
-  air_conditioner: Wind,
-  dehumidifier: Droplets,
-  refrigerator: Droplets,
-  heater: Flame,
-  fan: Fan,
-  tv: Tv,
-  washing_machine: Fan,
-  led_bulb: Zap,
-};
+import { getUserData } from "../utils/user-storage";
+import { getDeviceIcon } from "../utils/device-types";
 
 const analysisSteps = [
   "Scanning device usage patterns",
@@ -35,11 +24,11 @@ export default function AIAnalysis() {
   useEffect(() => {
     const loadDevices = () => {
       try {
-        const profile = getCurrentUserProfile();
-        if (profile?.devices && profile.devices.length > 0) {
-          setAvailableDevices(profile.devices);
+        const userData = getUserData();
+        if (userData?.devices && userData.devices.length > 0) {
+          setAvailableDevices(userData.devices);
           // Pre-select all devices by default
-          setSelectedDevices(profile.devices.map((d: any) => d.id));
+          setSelectedDevices(userData.devices.map((d: any) => d.id));
         }
       } catch (error) {
         console.error("Failed to load devices:", error);
@@ -56,13 +45,32 @@ export default function AIAnalysis() {
     }
   };
 
-  const [error, setError] = useState<string | null>(null);
-
   const startAnalysis = async () => {
     if (selectedDevices.length > 0) {
+      // TEMPORARILY DISABLED FOR TESTING - Uncomment to re-enable 1 analysis limit
+      /*
+      // Check if analysis has already been done (limit to 1 for testing)
+      const existingPlans = localStorage.getItem('aiGeneratedPlans');
+      if (existingPlans) {
+        // Import notification service
+        const { default: notificationService } = await import('../services/notification.service');
+        
+        // Send notification about analysis limit
+        await notificationService.send({
+          id: `analysis_limit_${Date.now()}`,
+          type: 'usage_alert',
+          title: 'Analysis Limit Reached',
+          message: 'App is still in development, analysis is limited to 1 trial',
+          timestamp: new Date().toISOString(),
+          read: false,
+          actionUrl: '/plans',
+        });
+        return;
+      }
+      */
+
       setStage("analyzing");
       setCurrentStep(0);
-      setError(null); // Clear previous errors
 
       try {
         // Import AI service dynamically
@@ -77,7 +85,21 @@ export default function AIAnalysis() {
         setStage("complete");
       } catch (err: any) {
         console.error('AI analysis failed:', err);
-        setError(err.message || 'Failed to generate plans. Please try again.');
+
+        // Import notification service
+        const { default: notificationService } = await import('../services/notification.service');
+
+        // Send error notification instead of showing in UI
+        await notificationService.send({
+          id: `analysis_error_${Date.now()}`,
+          type: 'usage_alert',
+          title: 'Analysis Error',
+          message: 'Sorry we ran into an error, we will fix this soon',
+          timestamp: new Date().toISOString(),
+          read: false,
+          actionUrl: '/dashboard',
+        });
+
         setStage("selection");
       }
     }
@@ -123,21 +145,11 @@ export default function AIAnalysis() {
             </p>
           </motion.div>
 
-          {/* Error Alert */}
-          {error && (
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="mt-4 bg-red-50 border border-red-200 rounded-2xl p-4"
-            >
-              <p className="text-sm text-red-600">{error}</p>
-            </motion.div>
-          )}
         </div>
 
         <div className="px-5 space-y-3">
           {availableDevices.map((device, index) => {
-            const Icon = iconMap[device.deviceType as keyof typeof iconMap] || iconMap[device.type as keyof typeof iconMap] || Zap;
+            const Icon = getDeviceIcon(device.deviceType);
             const isSelected = selectedDevices.includes(device.id);
 
             return (

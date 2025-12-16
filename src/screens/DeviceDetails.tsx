@@ -1,21 +1,11 @@
 import { useParams, useNavigate } from "react-router";
-import { ArrowLeft, Wind, Droplets, Flame, Fan, Zap, Edit2, X, Tv } from "lucide-react";
+import { ArrowLeft, Edit2, X } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { useState, useEffect } from "react";
 import BottomNav from "../components/BottomNav";
-import { getCurrentUserProfile, updateUserProfile } from "../utils/storage";
+import { getUserData, updateUserDevices } from "../utils/user-storage";
+import { getDeviceIcon } from "../utils/device-types";
 
-const iconMap = {
-  ac: Wind,
-  air_conditioner: Wind,
-  dehumidifier: Droplets,
-  refrigerator: Droplets,
-  heater: Flame,
-  fan: Fan,
-  tv: Tv,
-  washing_machine: Fan,
-  led_bulb: Zap,
-};
 
 // Helper function to calculate estimated costs based on power rating
 const calculateDeviceCosts = (power: number, pricePerKwh: number, currencySymbol: string = '$') => {
@@ -44,24 +34,57 @@ export default function DeviceDetails() {
   const [frequency, setFrequency] = useState("");
   const [hoursPerDay, setHoursPerDay] = useState("");
 
+  // Helper function to check if device is in active plan
+  const isDeviceInActivePlan = (deviceId: string): boolean => {
+    try {
+      const savedPlan = localStorage.getItem("activePlan");
+      if (!savedPlan) return false;
+
+      const plan = JSON.parse(savedPlan);
+
+      // Get the full plan details from aiGeneratedPlans
+      const savedPlans = localStorage.getItem('aiGeneratedPlans');
+      if (!savedPlans) return false;
+
+      const plansData = JSON.parse(savedPlans);
+      let fullPlan = null;
+
+      // Map plan ID to full plan data
+      if (plan.id === '1') fullPlan = plansData.costSaver;
+      else if (plan.id === '2') fullPlan = plansData.ecoMode;
+      else if (plan.id === '3') fullPlan = plansData.comfortBalance;
+
+      if (!fullPlan || !fullPlan.devices) return false;
+
+      // Check if device ID is in the plan's devices array
+      return fullPlan.devices.includes(deviceId);
+    } catch (error) {
+      console.error("Error checking device in active plan:", error);
+      return false;
+    }
+  };
+
   useEffect(() => {
     // Load device from localStorage
     const loadDevice = () => {
       try {
-        const profile = getCurrentUserProfile();
-        const foundDevice = profile?.devices?.find((d: any) => d.id === id);
+        const userData = getUserData();
+        const foundDevice = userData?.devices?.find((d: any) => d.id === id);
 
         if (foundDevice) {
-          const pricePerKwh = profile?.energyCosts?.pricePerKwh || 0.15;
-          const currencySymbol = profile?.energyCosts?.currencySymbol || '$';
+          const pricePerKwh = userData?.energyCosts?.pricePerKwh || 0.15;
+          const currencySymbol = userData?.energyCosts?.currencySymbol || '$';
           const devicePower = foundDevice.wattage || 0;
           const calculatedCosts = calculateDeviceCosts(devicePower, pricePerKwh, currencySymbol);
+
+          // Determine device status based on active plan inclusion
+          const deviceStatus = isDeviceInActivePlan(foundDevice.id) ? "active" : "inactive";
 
           setDevice({
             ...foundDevice,
             power: devicePower,
             type: foundDevice.deviceType,
-            status: "active",
+            status: deviceStatus,
             ...calculatedCosts,
           });
           setDeviceName(foundDevice.customName || foundDevice.originalName);
@@ -84,10 +107,10 @@ export default function DeviceDetails() {
   const handleSaveName = () => {
     try {
       // Update device name and survey data in localStorage
-      const profile = getCurrentUserProfile();
+      const userData = getUserData();
 
-      if (profile) {
-        const updatedDevices = profile.devices.map((d: any) =>
+      if (userData) {
+        const updatedDevices = userData.devices.map((d: any) =>
           d.id === id ? {
             ...d,
             customName: deviceName,
@@ -100,7 +123,7 @@ export default function DeviceDetails() {
             }
           } : d
         );
-        updateUserProfile({ devices: updatedDevices });
+        updateUserDevices(updatedDevices);
 
         // Update local device state
         setDevice({
@@ -122,7 +145,7 @@ export default function DeviceDetails() {
     }
   };
 
-  const Icon = iconMap[device.type as keyof typeof iconMap] || Wind;
+  const Icon = getDeviceIcon(device.type);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 pb-20 overflow-y-auto scrollbar-hide">

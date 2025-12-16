@@ -30,6 +30,7 @@ export interface NotificationData {
     savingsAmount?: number;
     weatherCondition?: string;
     tip?: string;
+    tipIndex?: number;
     scheduledDevices?: number;
     estimatedCost?: number;
 }

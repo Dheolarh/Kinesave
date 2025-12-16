@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router";
-import { ArrowLeft, TrendingDown, Wind, Droplets, Bell, Sun, X, Tv, Lightbulb, Zap, Cloud, CloudRain, CloudSnow, CloudDrizzle } from "lucide-react";
+import { ArrowLeft, TrendingDown, Sun, X, Cloud, CloudRain, CloudSnow, CloudDrizzle } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { Calendar } from "../components/ui/calendar";
 import BottomNav from "../components/BottomNav";
 import notificationService from "../services/notification.service";
 import type { AIPlan } from "../types/ai-plan.types";
+import { getDeviceIcon } from "../utils/device-types";
 
 // Helper function to get weather icon based on condition
 const getWeatherIcon = (condition: string) => {
@@ -118,7 +119,7 @@ export default function PlanDetails() {
             };
         } else if (plan.type === 'eco') {
             return {
-                label1: "Eco Friendly",
+                label1: "Eco Gain",
                 value1: `+ ${metrics.ecoImprovementPercentage || 0}% `,
                 label2: "Monthly Cost Cap",
                 value2: `${currencySymbol}${metrics.monthlyCostCap || 0} `
@@ -209,15 +210,17 @@ export default function PlanDetails() {
         }, 3000);
     };
 
+    // Handle date selection
     const handleDateSelect = (date: Date | undefined) => {
-        if (date) {
-            setSelectedDate(date);
-            setShowModal(true);
-        }
+        if (!date) return;
+
+        // Always set the date and show modal (even if same date is clicked)
+        setSelectedDate(date);
+        setShowModal(true);
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 pb-20 overflow-y-auto scrollbar-hide">
+        <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 pb-32 overflow-y-auto scrollbar-hide">
             <AnimatePresence>
                 {showNotification && (
                     <motion.div
@@ -227,7 +230,6 @@ export default function PlanDetails() {
                         exit={{ y: -100, opacity: 0 }}
                         transition={{ type: "spring", damping: 20 }}
                     >
-                        <Bell className="w-5 h-5" strokeWidth={1.5} />
                         <div className="flex-1">
                             <div className="text-sm mb-0.5">Plan Activated</div>
                             <div className="text-xs text-white/70">
@@ -287,6 +289,42 @@ export default function PlanDetails() {
                 </div>
 
                 <div>
+                    <h2 className="text-xs tracking-wide text-black/60 mb-3">DAILY USAGE PATTERN</h2>
+                    <motion.div
+                        className="bg-white/60 backdrop-blur-xl border border-white/60 rounded-2xl p-5 shadow-lg"
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.3 }}
+                    >
+                        <Calendar
+                            mode="single"
+                            selected={selectedDate}
+                            onSelect={handleDateSelect}
+                            className="w-full"
+                            classNames={{
+                                months: "flex flex-col w-full",
+                                month: "w-full",
+                                caption: "flex justify-center pt-1 relative items-center w-full mb-4",
+                                caption_label: "text-sm",
+                                nav: "flex items-center gap-1",
+                                table: "w-full border-collapse",
+                                head_row: "flex w-full",
+                                head_cell: "text-black/50 rounded-md w-full text-xs",
+                                row: "flex w-full mt-2",
+                                cell: "relative p-0 text-center text-sm focus-within:relative focus-within:z-20 flex-1",
+                                day: "h-9 w-full p-0 hover:bg-black/5 rounded-lg transition-colors",
+                                day_selected: "bg-black/10 text-black hover:bg-black/10 hover:text-black",
+                                day_today: "bg-black text-white border border-black",
+                                day_outside: "text-black/30",
+                            }}
+                        />
+                        <p className="text-xs text-black/50 text-center mt-4">
+                            Tap a date to view usage plan
+                        </p>
+                    </motion.div>
+                </div>
+
+                <div>
                     <h2 className="text-xs tracking-wide text-black/60 mb-3">DEVICES INCLUDED</h2>
                     <div className="space-y-2">
                         {plan.devices && plan.devices.length > 0 ? (
@@ -299,18 +337,9 @@ export default function PlanDetails() {
                                     <div className="flex items-center gap-3 flex-1 min-w-0">
                                         <div className="w-10 h-10 bg-white/50 backdrop-blur-sm border border-white/60 rounded-xl flex items-center justify-center flex-shrink-0">
                                             {(() => {
-                                                const deviceType = deviceNames[deviceId]?.type?.toLowerCase() || '';
-                                                if (deviceType.includes('tv') || deviceType.includes('television')) {
-                                                    return <Tv className="w-5 h-5" strokeWidth={1.5} />;
-                                                } else if (deviceType.includes('light') || deviceType.includes('bulb')) {
-                                                    return <Lightbulb className="w-5 h-5" strokeWidth={1.5} />;
-                                                } else if (deviceType.includes('pump') || deviceType.includes('water')) {
-                                                    return <Droplets className="w-5 h-5" strokeWidth={1.5} />;
-                                                } else if (deviceType.includes('refrigerator') || deviceType.includes('freezer') || deviceType.includes('fridge')) {
-                                                    return <Wind className="w-5 h-5" strokeWidth={1.5} />;
-                                                } else {
-                                                    return <Zap className="w-5 h-5" strokeWidth={1.5} />;
-                                                }
+                                                const deviceType = deviceNames[deviceId]?.type || '';
+                                                const DeviceIcon = getDeviceIcon(deviceType);
+                                                return <DeviceIcon className="w-5 h-5" strokeWidth={1.5} />;
                                             })()}
                                         </div>
                                         <div className="flex-1 min-w-0">
@@ -351,78 +380,16 @@ export default function PlanDetails() {
                         )}
                     </div>
                 </div>
-
-                <div>
-                    <h2 className="text-xs tracking-wide text-black/60 mb-3">DAILY USAGE PATTERN</h2>
-                    <motion.div
-                        className="bg-white/60 backdrop-blur-xl border border-white/60 rounded-2xl p-5 shadow-lg"
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.3 }}
-                    >
-                        <Calendar
-                            mode="single"
-                            selected={selectedDate}
-                            onSelect={handleDateSelect}
-                            className="w-full"
-                            classNames={{
-                                months: "flex flex-col w-full",
-                                month: "w-full",
-                                caption: "flex justify-center pt-1 relative items-center w-full mb-4",
-                                caption_label: "text-sm",
-                                nav: "flex items-center gap-1",
-                                table: "w-full border-collapse",
-                                head_row: "flex w-full",
-                                head_cell: "text-black/50 rounded-md w-full text-xs",
-                                row: "flex w-full mt-2",
-                                cell: "relative p-0 text-center text-sm focus-within:relative focus-within:z-20 flex-1",
-                                day: "h-9 w-full p-0 hover:bg-black/5 rounded-lg transition-colors",
-                                day_selected: "bg-black/10 text-black hover:bg-black/10 hover:text-black",
-                                day_today: "bg-black text-white border border-black",
-                                day_outside: "text-black/30",
-                            }}
-                        />
-                        <p className="text-xs text-black/50 text-center mt-4">
-                            Tap a date to view usage plan
-                        </p>
-                    </motion.div>
-                </div>
-
-                <div>
-                    <h2 className="text-xs tracking-wide text-black/60 mb-3">SMART TIPS</h2>
-                    <div className="space-y-2">
-                        {plan?.smartAlerts && plan.smartAlerts.length > 0 ? (
-                            plan.smartAlerts.map((tip: any, index: number) => {
-                                // Handle both string and object formats
-                                const tipText = typeof tip === 'string' ? tip : tip.alert || tip.tip || tip.message;
-
-                                return (
-                                    <motion.div
-                                        key={index}
-                                        className="bg-white/40 backdrop-blur-xl border border-white/60 rounded-2xl p-4 flex items-start gap-3 shadow-lg"
-                                        initial={{ opacity: 0, x: -10 }}
-                                        animate={{ opacity: 1, x: 0 }}
-                                        transition={{ delay: 0.35 + index * 0.05 }}
-                                    >
-                                        <Bell className="w-4 h-4 mt-0.5 flex-shrink-0 text-black/60" strokeWidth={1.5} />
-                                        <span className="text-sm leading-relaxed">{tipText}</span>
-                                    </motion.div>
-                                );
-                            })
-                        ) : (
-                            <p className="text-sm text-black/50">No tips available yet</p>
-                        )}
-                    </div>
-                </div>
             </div>
 
-            <div className="px-5 pb-6">
+            {/* Fixed Select Plan Button */}
+            <div className="fixed bottom-24 left-0 right-0 px-5 pb-2 bg-gradient-to-t from-gray-100 via-gray-100 to-transparent pt-6 z-30">
                 <button
                     onClick={handleSelect}
                     disabled={selected}
-                    className="w-full py-3.5 bg-black text-white rounded-full text-sm tracking-wide hover:bg-black/90 transition-colors disabled:opacity-50"
+                    className="w-full py-3.5 bg-black text-white rounded-full text-sm tracking-wide hover:bg-black/90 transition-colors disabled:opacity-50 shadow-lg"
                 >
-                    {selected ? "Plan Selected ✓" : "Select This Plan"}
+                    {selected ? "Plan Selected" : "Select This Plan"}
                 </button>
             </div>
 
@@ -518,12 +485,6 @@ export default function PlanDetails() {
                                     </div>
                                 </div>
 
-                                {/* Peak Usage */}
-                                <div className="bg-white/60 backdrop-blur-xl border border-white/60 rounded-2xl p-4 shadow-lg">
-                                    <div className="text-xs text-black/50 mb-1">Peak Usage Period</div>
-                                    <div className="text-sm">2pm - 6pm</div>
-                                </div>
-
                                 {/* Devices Section Header */}
                                 <h3 className="text-xs tracking-wide text-black/60">DEVICES & USAGE</h3>
                             </div>
@@ -537,7 +498,7 @@ export default function PlanDetails() {
                                             if (!usage || typeof usage !== 'object') return null;
 
                                             const device = deviceNames[deviceId];
-                                            const deviceType = device?.type?.toLowerCase() || '';
+                                            const deviceType = device?.type || '';
 
                                             // Get device name
                                             let deviceName = deviceId;
@@ -553,9 +514,9 @@ export default function PlanDetails() {
                                             }
 
                                             // Determine priority
-                                            const priority = device?.priority ||
-                                                (deviceType.includes('tv') || deviceType.includes('light') ? 'Low' :
-                                                    deviceType.includes('refrigerator') || deviceType.includes('pump') ? 'High' : 'Medium');
+                                            const priority = device?.priority || 'Medium';
+
+                                            const DeviceIcon = getDeviceIcon(deviceType);
 
                                             return (
                                                 <div
@@ -564,17 +525,7 @@ export default function PlanDetails() {
                                                 >
                                                     <div className="flex items-center gap-3 mb-2">
                                                         <div className="w-10 h-10 bg-white/50 backdrop-blur-sm border border-white/60 rounded-xl flex items-center justify-center flex-shrink-0">
-                                                            {deviceType.includes('tv') || deviceType.includes('television') ? (
-                                                                <Tv className="w-5 h-5" strokeWidth={1.5} />
-                                                            ) : deviceType.includes('light') || deviceType.includes('bulb') ? (
-                                                                <Lightbulb className="w-5 h-5" strokeWidth={1.5} />
-                                                            ) : deviceType.includes('pump') || deviceType.includes('water') ? (
-                                                                <Droplets className="w-5 h-5" strokeWidth={1.5} />
-                                                            ) : deviceType.includes('refrigerator') || deviceType.includes('freezer') || deviceType.includes('fridge') ? (
-                                                                <Wind className="w-5 h-5" strokeWidth={1.5} />
-                                                            ) : (
-                                                                <Zap className="w-5 h-5" strokeWidth={1.5} />
-                                                            )}
+                                                            <DeviceIcon className="w-5 h-5" strokeWidth={1.5} />
                                                         </div>
                                                         <div className="flex-1">
                                                             <div className="text-sm mb-0.5">{deviceName}</div>

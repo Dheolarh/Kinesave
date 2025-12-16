@@ -4,6 +4,7 @@ import { router } from './utils/routes';
 import notificationScheduler from './services/notification-scheduler.service';
 import notificationService from './services/notification.service';
 import weatherMonitor from './services/weather-monitor.service';
+import { ToastProvider } from './contexts/ToastContext';
 
 function App() {
   useEffect(() => {
@@ -27,7 +28,11 @@ function App() {
     };
   }, []);
 
-  return <RouterProvider router={router} />;
+  return (
+    <ToastProvider>
+      <RouterProvider router={router} />
+    </ToastProvider>
+  );
 }
 
 export default App;

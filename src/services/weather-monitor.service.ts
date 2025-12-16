@@ -1,5 +1,5 @@
 import notificationService from './notification.service';
-import { getCurrentUserProfile } from '../utils/storage';
+import { getUserData } from '../utils/user-storage';
 
 /**
  * Weather Monitoring Service
@@ -43,7 +43,7 @@ class WeatherMonitorService {
      */
     private async checkWeather(): Promise<void> {
         try {
-            const profile = getCurrentUserProfile();
+            const userData = getUserData();
             if (!profile?.location) {
                 console.log('No location set, skipping weather check');
                 return;
@@ -80,7 +80,7 @@ class WeatherMonitorService {
         // Temperature drop (good for turning off AC)
         if (tempDiff <= -3) {
             await this.sendWeatherAdvisory(
-                '🌡️ Temperature Dropping',
+                'Temperature Dropping',
                 `Temperature dropped from ${oldWeather.temperature}°C to ${newWeather.temperature}°C. Consider turning off AC to save energy!`,
                 newWeather
             );
@@ -107,7 +107,7 @@ class WeatherMonitorService {
         // Rain/storm detected
         if (!oldCondition.includes('rain') && newCondition.includes('rain')) {
             await this.sendWeatherAdvisory(
-                '🌧️ Rain Detected',
+                'Rain Detected',
                 `Rain is here! Temperature: ${newWeather.temperature}°C. AC might not be needed.`,
                 newWeather
             );
@@ -125,7 +125,7 @@ class WeatherMonitorService {
         // Clear weather after rain
         if (oldCondition.includes('rain') && newCondition.includes('clear')) {
             await this.sendWeatherAdvisory(
-                '🌤️ Weather Clearing Up',
+                'Weather Clearing Up',
                 `Rain has stopped! Temperature: ${newWeather.temperature}°C. Great time to air out your home.`,
                 newWeather
             );

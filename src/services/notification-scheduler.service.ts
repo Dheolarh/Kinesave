@@ -40,17 +40,110 @@ class NotificationScheduler {
      */
     private checkScheduledNotifications(): void {
         const settings = notificationService.getSettings();
-        if (!settings.enabled || !settings.dailyReminder.enabled) return;
+        if (!settings.enabled) return;
 
         const now = new Date();
         const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
         const currentDate = now.toISOString().split('T')[0];
+        const currentHour = now.getHours();
 
-        // Check if it's the scheduled time and not sent today
-        if (currentTime === settings.dailyReminder.time &&
+        // Check daily reminder (8:30 AM)
+        if (settings.dailyReminder.enabled &&
+            currentTime === settings.dailyReminder.time &&
             settings.dailyReminder.lastSent !== currentDate) {
             this.sendDailyReminder();
             this.updateLastSent(currentDate);
+        }
+
+        // Check bi-daily smart tip notification
+        // Send at random time between 8-10am or 5-7pm every 2 days
+        if (settings.deviceTips) {
+            this.checkSmartTipNotification(currentHour, currentDate);
+        }
+    }
+
+    /**
+     * Check and send bi-daily smart tip notification
+     */
+    private checkSmartTipNotification(currentHour: number, currentDate: string): void {
+        const lastSentData = localStorage.getItem('smartTipLastSent');
+        const lastSent = lastSentData ? JSON.parse(lastSentData) : null;
+
+        // Check if 2 days have passed since last tip
+        if (lastSent) {
+            const lastSentDate = new Date(lastSent.date);
+            const daysSinceLastSent = Math.floor((new Date().getTime() - lastSentDate.getTime()) / (1000 * 60 * 60 * 24));
+            if (daysSinceLastSent < 2) return; // Not time yet
+        }
+
+        // Check if we're in the time windows (8-10am or 5-7pm)
+        const inMorningWindow = currentHour >= 8 && currentHour < 10;
+        const inEveningWindow = currentHour >= 17 && currentHour < 19;
+
+        if (!inMorningWindow && !inEveningWindow) return;
+
+        // Prevent sending twice in the same day
+        if (lastSent && lastSent.date === currentDate) return;
+
+        // Send smart tip notification
+        this.sendSmartTipNotification(currentDate);
+    }
+
+    /**
+     * Send a random smart tip from the active plan
+     */
+    private async sendSmartTipNotification(currentDate: string): Promise<void> {
+        try {
+            const activePlan = localStorage.getItem('activePlan');
+            if (!activePlan) return;
+
+            const plan = JSON.parse(activePlan);
+            const aiPlansData = localStorage.getItem('aiGeneratedPlans');
+            if (!aiPlansData) return;
+
+            const aiPlans = JSON.parse(aiPlansData);
+
+            // Get the current plan data
+            const planKey = plan.id === '1' || plan.type === 'cost' ? 'costSaver' :
+                plan.id === '2' || plan.type === 'eco' ? 'ecoMode' :
+                    'comfortBalance';
+
+            const currentPlanData = aiPlans[planKey];
+            if (!currentPlanData || !currentPlanData.smartAlerts || currentPlanData.smartAlerts.length === 0) {
+                return;
+            }
+
+            // Pick a random smart tip
+            const randomIndex = Math.floor(Math.random() * currentPlanData.smartAlerts.length);
+            const tip = currentPlanData.smartAlerts[randomIndex];
+            const tipText = typeof tip === 'string' ? tip : tip.alert || tip.tip || tip.message;
+
+            // Send notification
+            await notificationService.send({
+                id: `smart_tip_${Date.now()}`,
+                type: 'device_tip',
+                title: 'Energy Saving Tip',
+                message: tipText,
+                timestamp: new Date().toISOString(),
+                read: false,
+                actionUrl: `/plan/${plan.id}`,
+                data: {
+                    planId: plan.id,
+                    planType: plan.type || planKey.replace('Saver', '').toLowerCase(),
+                    tipIndex: randomIndex,
+                },
+            });
+
+            // Update last sent
+            localStorage.setItem('smartTipLastSent', JSON.stringify({
+                date: currentDate,
+                time: new Date().toISOString(),
+                tipIndex: randomIndex,
+            }));
+
+            console.log('Smart tip notification sent');
+        } catch (error) {
+            console.error('Failed to send smart tip notification:', error);
         }
     }
 

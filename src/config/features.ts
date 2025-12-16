@@ -28,6 +28,15 @@ export interface FeatureConfig {
      * OpenWeatherMap API key (required if usePremiumWeatherAPI = true)
      */
     openWeatherMapApiKey?: string;
+
+    /**
+     * NEW: Use 3-stage AI prompt architecture
+     * - true: Use new device allocation → cost analysis → tips flow
+     * - false: Use legacy chunked generation approach
+     * 
+     * DEFAULT: true (new architecture is production-ready)
+     */
+    useNewAILogic: boolean;
 }
 
 /**
@@ -47,6 +56,9 @@ export const FEATURES: FeatureConfig = {
 
     // OpenWeatherMap API key (add when enabling premium)
     openWeatherMapApiKey: import.meta.env.VITE_OPENWEATHER_API_KEY || undefined,
+
+    // NEW: 3-stage AI prompt architecture
+    useNewAILogic: true, // Set to false to use legacy chunked approach
 };
 
 /**

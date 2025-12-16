@@ -5,22 +5,32 @@ import {
 
 /**
  * AWS Bedrock Service for Claude Sonnet 3 Integration
- * This service handles communication with Amazon Bedrock using Claude Sonnet 3
+ * Uses AWS credentials for authentication
  */
 
 export class BedrockService {
     private client: BedrockRuntimeClient;
-    private modelId: string = 'anthropic.claude-3-sonnet-20240229-v1:0'; // Works with on-demand throughput
+    private modelId: string = 'anthropic.claude-3-sonnet-20240229-v1:0';
 
     constructor() {
-        // Initialize Bedrock client with credentials
+        const region = import.meta.env.VITE_AWS_REGION || 'us-east-1';
+        const accessKeyId = import.meta.env.VITE_AWS_ACCESS_KEY_ID;
+        const secretAccessKey = import.meta.env.VITE_AWS_SECRET_ACCESS_KEY;
+
+        if (!accessKeyId || !secretAccessKey) {
+            throw new Error('AWS credentials (VITE_AWS_ACCESS_KEY_ID, VITE_AWS_SECRET_ACCESS_KEY) are required in .env');
+        }
+
+        // Initialize Bedrock client with AWS credentials
         this.client = new BedrockRuntimeClient({
-            region: import.meta.env.VITE_AWS_REGION || 'us-east-1',
+            region,
             credentials: {
-                accessKeyId: import.meta.env.VITE_AWS_ACCESS_KEY_ID || '',
-                secretAccessKey: import.meta.env.VITE_AWS_SECRET_ACCESS_KEY || '',
+                accessKeyId,
+                secretAccessKey,
             },
         });
+
+        console.log('Bedrock service initialized with AWS credentials');
     }
 
     /**

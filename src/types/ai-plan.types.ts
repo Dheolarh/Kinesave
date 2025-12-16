@@ -194,3 +194,58 @@ export interface DevicePollutionProfile {
     impactFactors: string[];
     ecoScoreDeduction: number; // points per hour
 }
+
+// ============================================
+// NEW: 3-STAGE AI PROMPT TYPES
+// ============================================
+
+/**
+ * Stage 1: Device Allocation Response
+ * Maps day number to array of device IDs that should run that day
+ */
+export interface DeviceAllocationChunk {
+    [dayNumber: number]: string[]; // device IDs allocated for this day
+}
+
+/**
+ * Stage 2: Cost Analysis Response for a single day
+ */
+export interface CostAnalysisDay {
+    dayNumber: number;
+    date: string;
+    devices: {
+        [deviceId: string]: DeviceHourAllocation;
+    };
+    optimizedDailyCost: number;
+    weather: {
+        condition: string;
+        avgTemp: number;
+    };
+}
+
+/**
+ * Device hour and cost allocation for a specific day
+ */
+export interface DeviceHourAllocation {
+    hours: number; // hours of usage
+    window: string; // time window (e.g., "2pm-6pm" or "All day")
+    cost: number; // calculated cost for this device on this day
+}
+
+/**
+ * Stage 3: Smart Tips Response
+ */
+export interface SmartTipsResponse {
+    tips: Record<string, string[]>; // deviceId -> array of tips (max 3 per device)
+    displayTip: string | null; // Single tip ID for UI display (format: "deviceId_tip1")
+    notificationTips: string[]; // All tips for notifications
+}
+
+/**
+ * Complete 30-day schedule after combining all chunks from Stage 2
+ */
+export interface Complete30DaySchedule {
+    dailySchedules: CostAnalysisDay[];
+    totalOptimizedCost: number;
+    averageDailyCost: number;
+}

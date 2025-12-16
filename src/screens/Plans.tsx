@@ -140,7 +140,7 @@ export default function Plans() {
                 {plan.type === 'eco' && (
                   <>
                     <div>
-                      <p className="text-xs text-black/50 mb-1">Eco Friendly</p>
+                      <p className="text-xs text-black/50 mb-1">Eco Gain</p>
                       <p className="text-lg tracking-tight text-green-600">
                         +{plan.metrics.ecoImprovementPercentage || 0}%
                       </p>
@@ -164,7 +164,7 @@ export default function Plans() {
                       </p>
                     </div>
                     <div>
-                      <p className="text-xs text-black/50 mb-1">Eco Friendly Gain</p>
+                      <p className="text-xs text-black/50 mb-1">Eco Gain</p>
                       <p className="text-lg tracking-tight text-green-600">
                         +{plan.metrics.ecoFriendlyGainPercentage || 0}%
                       </p>

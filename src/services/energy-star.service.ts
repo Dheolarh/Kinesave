@@ -592,7 +592,7 @@ class DeviceSpecsService {
      * Search for devices in local database
      */
     async searchDevices(query: SearchQuery): Promise<DeviceSpec[]> {
-        console.log('🔍 Searching local device database:', query);
+        console.log('Searching local device database:', query);
 
         const deviceType = query.deviceType || 'air_conditioner';
         let devices = this.deviceDatabase[deviceType] || this.deviceDatabase.air_conditioner;

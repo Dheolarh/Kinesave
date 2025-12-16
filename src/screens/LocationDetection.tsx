@@ -259,7 +259,7 @@ export default function LocationDetection() {
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="e.g., Agege, Lagos"
+                  placeholder="e.g.,  Maizuru-shi, Kyoto, Japan"
                   className="w-full pl-12 pr-4 py-3 bg-white/40 backdrop-blur-xl border border-white/60 rounded-2xl text-sm placeholder:text-black/40 focus:outline-none focus:ring-2 focus:ring-black/10"
                   autoFocus
                 />
