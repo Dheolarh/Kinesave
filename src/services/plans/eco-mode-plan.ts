@@ -16,14 +16,14 @@ export class EcoModePlan {
      * Generate Eco Mode plan
      */
     async generate(data: PreAnalysisData): Promise<AIPlan> {
-        console.log('\n🟢 === ECO MODE PLAN (Hybrid: AI Hours + Eco + Trim) ===');
+        console.log('ECO MODE PLAN (Hybrid: AI Hours + Eco + Trim)');
 
         // Use average monthly cost for eco mode
         const dailyBudget = data.budget.averageMonthlyCost / 30;
         const targetBudget = dailyBudget; // Stay within average budget
 
-        console.log(`🌱 Eco Mode: Daily budget = ${data.budget.currencySymbol}${dailyBudget.toFixed(2)}`);
-        console.log(`🎯 Eco Mode: Target = ${data.budget.currencySymbol}${targetBudget.toFixed(2)}`);
+        console.log(`Eco Mode: Daily budget = ${data.budget.currencySymbol}${dailyBudget.toFixed(2)}`);
+        console.log(`Eco Mode: Target = ${data.budget.currencySymbol}${targetBudget.toFixed(2)}`);
 
         // Step 1: Get AI eco ratings + suggested hours
         const aiResponse = await this.getEcoOptimizedHours(data);
@@ -41,7 +41,7 @@ export class EcoModePlan {
         // Step 5: Calculate eco gain percentage
         const ecoGain = this.calculateEcoGain(data.devices, dailySchedules);
 
-        console.log(`✅ Eco Mode complete: Avg eco score ${avgEcoScore.toFixed(1)}/100, Eco gain: ${ecoGain.toFixed(1)}%, Cost: ₦${avgDailyCost.toFixed(2)}/day`);
+        console.log(`Eco Mode complete: Avg eco score ${avgEcoScore.toFixed(1)}/100, Eco gain: ${ecoGain.toFixed(1)}%, Cost: ${avgDailyCost.toFixed(2)}/day`);
 
         return {
             id: 'eco-mode',
@@ -69,13 +69,13 @@ export class EcoModePlan {
     }> {
         const prompt = this.buildPrompt(data);
 
-        console.log('🤖 Calling AI for eco-optimized hours...');
+        console.log('Calling AI for eco-optimized hours...');
 
         const systemPrompt = `You are an environmental efficiency expert. Suggest eco-optimized usage hours and rate devices by environmental impact. Return ONLY valid JSON.`;
 
         const response = await bedrockService.getJSONResponse(prompt, systemPrompt);
 
-        console.log('✅ Eco hours + ratings received');
+        console.log('Eco hours + ratings received');
 
         return {
             hours: response.hours || {},

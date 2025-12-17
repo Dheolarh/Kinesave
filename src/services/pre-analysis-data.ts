@@ -43,7 +43,7 @@ export class PreAnalysisData {
      * Fetch all required data for analysis
      */
     async fetchAll(deviceIds: string[]): Promise<void> {
-        console.log('📡 PreAnalysisData: Fetching all data...');
+        console.log('PreAnalysisData: Fetching all data...');
 
         // Fetch in parallel for speed
         await Promise.all([
@@ -52,7 +52,7 @@ export class PreAnalysisData {
             this.fetchBudgetData()
         ]);
 
-        console.log(`✅ PreAnalysisData: Fetched ${this.weather.length} days weather, ${this.devices.length} devices`);
+        console.log(`PreAnalysisData: Fetched ${this.weather.length} days weather, ${this.devices.length} devices`);
     }
 
     /**
@@ -150,7 +150,7 @@ export class PreAnalysisData {
         };
 
         localStorage.setItem('preAnalysisDataCache', JSON.stringify(cacheData));
-        console.log('💾 PreAnalysisData cached to localStorage');
+        console.log('PreAnalysisData cached to localStorage');
     }
 
     /**
@@ -168,7 +168,7 @@ export class PreAnalysisData {
 
             // Cache valid for 30 minutes
             if (ageInMinutes > 30) {
-                console.log('⏰ PreAnalysisData cache expired');
+                console.log('PreAnalysisData cache expired');
                 return false;
             }
 
@@ -176,7 +176,7 @@ export class PreAnalysisData {
             this.devices = cacheData.devices;
             this.budget = cacheData.budget;
 
-            console.log('✅ PreAnalysisData loaded from cache');
+            console.log('PreAnalysisData loaded from cache');
             return true;
         } catch (error) {
             console.error('Error loading cache:', error);

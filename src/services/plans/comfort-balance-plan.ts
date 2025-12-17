@@ -24,7 +24,7 @@ export class ComfortBalancePlan {
         const blendedBudget = (data.budget.averageMonthlyCost + data.budget.preferredBudget) / 2;
         const dailyBudget = blendedBudget / 30;
 
-        console.log(`⚖️ Comfort Balance: Daily budget = ${data.budget.currencySymbol}${dailyBudget.toFixed(2)}`);
+        console.log(`Comfort Balance: Daily budget = ${data.budget.currencySymbol}${dailyBudget.toFixed(2)}`);
 
         // Step 1: Average hours from Cost + Eco plans
         const averagedSchedules = this.averageHoursFromPlans(
@@ -48,7 +48,7 @@ export class ComfortBalancePlan {
             ? Math.abs((preferredBudget - comfortMonthlyBudget) / preferredBudget) * 100
             : 0;
 
-        console.log(`✅ Comfort Balance complete: Eco gain ${ecoGain.toFixed(1)}% (vs ₦${preferredBudget} preferred), Optimized: ₦${comfortMonthlyBudget.toFixed(2)}/month`);
+        console.log(`Comfort Balance complete: Eco gain ${ecoGain.toFixed(1)}% (vs ${preferredBudget} preferred), Optimized: ${comfortMonthlyBudget.toFixed(2)}/month`);
 
         return {
             id: 'comfort-balance',

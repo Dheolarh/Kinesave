@@ -49,14 +49,14 @@ class AIPlanService {
         // }
 
         try {
-            console.log('🚀 Starting AI plan generation for', deviceIds.length, 'devices');
+            console.log('Starting AI plan generation for', deviceIds.length, 'devices');
 
             // Step 1: Prepare data using PreAnalysisData
             const { PreAnalysisData } = await import('./pre-analysis-data');
             const preData = new PreAnalysisData();
             await preData.fetchAll(deviceIds);
 
-            console.log('✅ Pre-analysis data prepared');
+            console.log('Pre-analysis data prepared');
 
             // Step 2: Generate all 3 plans in parallel
             const { CostSaverPlan } = await import('./plans/cost-saver-plan');
@@ -66,8 +66,6 @@ class AIPlanService {
             const costSaverGenerator = new CostSaverPlan();
             const ecoModeGenerator = new EcoModePlan();
             const comfortBalanceGenerator = new ComfortBalancePlan();
-
-            console.log('Starting AI plan generation...');
 
             // Generate plans SEQUENTIALLY to avoid rate limits
             const startTime = Date.now();
@@ -100,7 +98,7 @@ class AIPlanService {
                 comfortBalance
             });
 
-            console.log('✅ Plans saved to user storage');
+            console.log('Plans saved to user storage');
 
             // Mark analysis as completed
             this.markAnalysisCompleted();
@@ -132,14 +130,14 @@ class AIPlanService {
         }
 
         // Fetch weather data
-        console.log('📡 Fetching weather forecast...');
+        console.log('Fetching weather forecast...');
         const weatherForecast = await weatherService.getMonthlyForecast(
             userData.location!.latitude,
             userData.location!.longitude,
             30 // Always fetch 30 days
         );
 
-        console.log(`✅ Weather forecast retrieved: ${weatherForecast.length} days`);
+        console.log(`Weather forecast retrieved: ${weatherForecast.length} days`);
         if (weatherForecast.length > 0) {
             console.log('First 5 days:', weatherForecast.slice(0, 5).map((w: any) => `${w.condition} ${w.avgTemp}°C`).join(', '));
             console.log(`Last 5 days (${weatherForecast.length - 4}-${weatherForecast.length}):`,

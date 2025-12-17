@@ -89,7 +89,7 @@ class WeatherMonitorService {
         // Temperature rise (might need AC)
         if (tempDiff >= 3 && newWeather.temperature >= 28) {
             await this.sendWeatherAdvisory(
-                '☀️ Getting Warmer',
+                'Getting Warmer',
                 `Temperature rose to ${newWeather.temperature}°C. Your AC might be needed today.`,
                 newWeather
             );
@@ -98,7 +98,7 @@ class WeatherMonitorService {
         // Cool weather detected (< 22°C)
         if (newWeather.temperature < 22 && oldWeather.temperature >= 22) {
             await this.sendWeatherAdvisory(
-                '❄️ Cool Weather Alert',
+                'Cool Weather Alert',
                 `It's now ${newWeather.temperature}°C - perfect weather to turn off AC and open windows!`,
                 newWeather
             );
@@ -116,7 +116,7 @@ class WeatherMonitorService {
         // Storm detected
         if (newCondition.includes('storm') || newCondition.includes('thunder')) {
             await this.sendWeatherAdvisory(
-                '⛈️ Storm Warning',
+                'Storm Warning',
                 `Storm detected in your area. Consider unplugging non-essential devices for safety.`,
                 newWeather
             );

@@ -40,7 +40,7 @@ export function trimToFitBudget(
 
     // If already under budget, return as-is
     if (totalCost <= dailyBudget) {
-        console.log('✅ Already under budget, no trimming needed');
+        console.log('Already under budget, no trimming needed');
         return buildResult(devices, pricePerKwh);
     }
 
@@ -114,7 +114,7 @@ export function trimToFitBudget(
     }
 
     if (totalCost > dailyBudget) {
-        console.warn(`⚠️ Could not trim to budget. Final: ₦${totalCost.toFixed(2)}`);
+        console.warn(`Could not trim to budget. Final: ${totalCost.toFixed(2)}`);
     }
 
     return buildResult(devices, pricePerKwh);

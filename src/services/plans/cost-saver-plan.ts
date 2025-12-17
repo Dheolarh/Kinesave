@@ -16,13 +16,13 @@ export class CostSaverPlan {
      * Generate Cost Saver plan
      */
     async generate(data: PreAnalysisData): Promise<AIPlan> {
-        console.log('\n🔵 === COST SAVER PLAN (Hybrid: AI Hours + Trim) ===');
+        console.log('COST SAVER PLAN (Hybrid: AI Hours + Trim)');
 
         const dailyBudget = data.budget.preferredBudget / 30;
         const targetBudget = dailyBudget * 0.95; // Aim for 95% of budget
 
-        console.log(`💰 Cost Saver: Daily budget = ${data.budget.currencySymbol}${dailyBudget.toFixed(2)}`);
-        console.log(`🎯 Cost Saver: Target = ${data.budget.currencySymbol}${targetBudget.toFixed(2)}`);
+        console.log(`Cost Saver: Daily budget = ${data.budget.currencySymbol}${dailyBudget.toFixed(2)}`);
+        console.log(`Cost Saver: Target = ${data.budget.currencySymbol}${targetBudget.toFixed(2)}`);
 
         // Step 1: Get AI-suggested hours for all devices (30 days)
         const aiHours = await this.getAISuggestedHours(data);
@@ -37,7 +37,7 @@ export class CostSaverPlan {
         const avgDailyCost = dailySchedules.reduce((sum, day) => sum + day.totalCost, 0) / 30;
         const monthlySaving = data.budget.averageMonthlyCost - (avgDailyCost * 30);
 
-        console.log(`✅ Cost Saver complete: Avg ₦${avgDailyCost.toFixed(2)}/day, Monthly saving: ₦${monthlySaving.toFixed(2)}`);
+        console.log(`Cost Saver complete: Avg ${avgDailyCost.toFixed(2)}/day, Monthly saving: ${monthlySaving.toFixed(2)}`);
 
         return {
             id: 'cost-saver',
@@ -62,13 +62,13 @@ export class CostSaverPlan {
     private async getAISuggestedHours(data: PreAnalysisData): Promise<{ [day: string]: { [deviceId: string]: number } }> {
         const prompt = this.buildPrompt(data);
 
-        console.log('🤖 Calling AI for usage hours...');
+        console.log('Calling AI for usage hours...');
 
         const systemPrompt = `You are a cost optimization expert. Suggest usage hours for each device per day based on weather and priority. Return ONLY valid JSON.`;
 
         const response = await bedrockService.getJSONResponse(prompt, systemPrompt);
 
-        console.log('✅ AI hours received');
+        console.log('AI hours received');
 
         return response.hours || {};
     }
