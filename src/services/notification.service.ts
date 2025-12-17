@@ -225,11 +225,15 @@ class NotificationService {
      * Send plan selected notification
      */
     async sendPlanSelectedNotification(planName: string, planType: 'cost' | 'eco' | 'balance', savings?: number): Promise<void> {
+        // Get currency symbol from user data
+        const { getUserData } = await import('../utils/user-storage');
+        const userData = getUserData();
+        const currencySymbol = userData?.energyCosts?.currencySymbol || '$';
         await this.send({
             id: `plan_${Date.now()} `,
             type: 'plan_selected',
             title: 'Plan Activated',
-            message: `${planName} is now your active energy plan${savings ? `. Save up to $${savings}/month!` : ''} `,
+            message: `${planName} is now your active energy plan${savings ? `. Save up to ${currencySymbol}${Math.trunc(savings)}/month!` : ''} `,
             timestamp: new Date().toISOString(),
             read: false,
             actionUrl: '/dashboard',

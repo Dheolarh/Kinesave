@@ -10,7 +10,7 @@ import {
 
 export class BedrockService {
     private client: BedrockRuntimeClient;
-    private modelId: string = 'anthropic.claude-3-sonnet-20240229-v1:0';
+    private modelId: string = 'anthropic.claude-3-sonnet-20240229-v1:0'; // Using 3.0 for higher rate limits
 
     constructor() {
         const region = import.meta.env.VITE_AWS_REGION || 'us-east-1';
@@ -46,8 +46,8 @@ export class BedrockService {
         try {
             const requestBody = {
                 anthropic_version: 'bedrock-2023-05-31',
-                max_tokens: 8192, // Increased for 30-day plan responses
-                temperature: 0.7,
+                max_tokens: 16384, // Increased from 8192 to handle 30-day plans with multiple devices
+                temperature: 0.9,  // Increased from 0.7 to encourage more daily variation
                 messages: [
                     {
                         role: 'user',

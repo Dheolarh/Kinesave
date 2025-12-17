@@ -47,6 +47,21 @@ export interface FeatureConfig {
  * - Standard: { use30DayAnalysis: true, usePremiumWeatherAPI: false } → 30-day with hybrid weather
  * - Premium: { use30DayAnalysis: true, usePremiumWeatherAPI: true } → 30-day with accurate weather
  */
+
+// Helper to get env vars in both Vite and Node.js
+const getEnvVar = (key: string): string | undefined => {
+    // Try import.meta.env first (browser/Vite environment)
+    const viteEnv = (import.meta as any)?.env?.[key];
+    if (viteEnv !== undefined) {
+        return viteEnv;
+    }
+    // Fallback to process.env for Node.js
+    if (typeof process !== 'undefined' && process.env) {
+        return process.env[key];
+    }
+    return undefined;
+};
+
 export const FEATURES: FeatureConfig = {
     // Main toggle: Set to true to enable 30-day analysis
     use30DayAnalysis: true, // MVP: Standard tier (hybrid forecast)
@@ -55,7 +70,7 @@ export const FEATURES: FeatureConfig = {
     usePremiumWeatherAPI: false, // MVP: Use free hybrid approach
 
     // OpenWeatherMap API key (add when enabling premium)
-    openWeatherMapApiKey: import.meta.env.VITE_OPENWEATHER_API_KEY || undefined,
+    openWeatherMapApiKey: getEnvVar('VITE_OPENWEATHER_API_KEY') || undefined,
 
     // NEW: 3-stage AI prompt architecture
     useNewAILogic: true, // Set to false to use legacy chunked approach

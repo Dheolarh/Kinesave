@@ -3,7 +3,7 @@ import { useNavigate } from "react-router";
 import { motion } from "motion/react";
 import { Check, ArrowLeft } from "lucide-react";
 import Orb from "../components/Orb";
-import { getUserData } from "../utils/user-storage";
+import { getUserData, getUserPlans, updateUserPlans } from "../utils/user-storage";
 import { getDeviceIcon } from "../utils/device-types";
 
 const analysisSteps = [
@@ -46,12 +46,10 @@ export default function AIAnalysis() {
   };
 
   const startAnalysis = async () => {
-    if (selectedDevices.length > 0) {
-      // TEMPORARILY DISABLED FOR TESTING - Uncomment to re-enable 1 analysis limit
-      /*
+    if (selectedDevices.length > 0) {      
       // Check if analysis has already been done (limit to 1 for testing)
-      const existingPlans = localStorage.getItem('aiGeneratedPlans');
-      if (existingPlans) {
+      const existingPlans = getUserPlans();
+      if (existingPlans && (existingPlans.costSaver || existingPlans.ecoMode || existingPlans.comfortBalance)) {
         // Import notification service
         const { default: notificationService } = await import('../services/notification.service');
         
@@ -67,7 +65,7 @@ export default function AIAnalysis() {
         });
         return;
       }
-      */
+      
 
       setStage("analyzing");
       setCurrentStep(0);
@@ -79,8 +77,8 @@ export default function AIAnalysis() {
         // Call AI service to generate plans
         const plans = await aiPlanService.generatePlans(selectedDevices);
 
-        // Save to localStorage
-        localStorage.setItem('aiGeneratedPlans', JSON.stringify(plans));
+        // Save to centralized storage
+        updateUserPlans(plans);
 
         setStage("complete");
       } catch (err: any) {

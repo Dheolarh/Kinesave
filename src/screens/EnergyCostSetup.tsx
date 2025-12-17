@@ -20,7 +20,7 @@ const getCurrencyForCountry = (countryName: string): { symbol: string; code: str
       return { symbol, code };
     }
   } catch (error) {
-    console.log(`Currency mapping not found for ${ countryName }, using USD`);
+    console.log(`Currency mapping not found for ${countryName}, using USD`);
   }
   // Default to USD if not found
   return { symbol: "$", code: "USD" };
@@ -52,71 +52,73 @@ export default function EnergyCostSetup() {
     : { symbol: "$", code: "USD" };
 
   const locationDisplay = locationData
-    ? `${ locationData.city }${ locationData.region ? `, ${locationData.region}` : "" } `
+    ? `${locationData.city}${locationData.region ? `, ${locationData.region}` : ""} `
     : "Unknown Location";
 
   // Load saved data on mount
   useEffect(() => {
-    const savedEnergyData = localStorage.getItem("energyData");
-    const savedDevices = localStorage.getItem("userDevices");
+    const userData = getUserData();
 
-    if (savedEnergyData) {
-      const { monthlyCost, pricePerKwh, preferredBudget } = JSON.parse(savedEnergyData);
-      setMonthlyCost(monthlyCost || "");
-      setPricePerKwh(pricePerKwh || "");
-      setPreferredBudget(preferredBudget || "");
+    if (userData?.energyCosts) {
+      const { monthlyCost, pricePerKwh, preferredBudget } = userData.energyCosts;
+      setMonthlyCost(monthlyCost?.toString() || "");
+      setPricePerKwh(pricePerKwh?.toString() || "");
+      setPreferredBudget(preferredBudget?.toString() || "");
     }
 
-    if (savedDevices) {
-      setSelectedDevices(JSON.parse(savedDevices));
+    if (userData?.devices) {
+      setSelectedDevices(userData.devices);
     }
   }, []);
 
   const handleRemoveDevice = (indexToRemove: number) => {
     const updatedDevices = selectedDevices.filter((_, index) => index !== indexToRemove);
     setSelectedDevices(updatedDevices);
-    localStorage.setItem("userDevices", JSON.stringify(updatedDevices));
+    updateUserDevices(updatedDevices);
   };
 
   const handleAddDevices = (device: any, deviceId?: string) => {
-    // Check if device already exists to avoid duplicates
-    if (selectedDevices.find(d => d.name === device.name)) {
+    // Generate or use provided ID
+    const newDeviceId = deviceId || device.id || generateDeviceId(device.customName || device.productName || device.name, selectedDevices.map(d => d.id));
+
+    // Check if device already exists by ID to avoid duplicates
+    if (selectedDevices.find(d => d.id === newDeviceId)) {
+      console.log('Device already exists, skipping');
       return;
     }
 
     // Map backend device to local format if needed
-    // The backend device likely has productName, brand, etc.
-    // EnergyCostSetup expects { name, power, ... }
     const newDevice = {
       ...device,
-      name: device.productName || device.name, // Handle both formats
+      id: newDeviceId,
+      name: device.productName || device.name,
       customName: device.customName,
       power: device.additionalSpecs?.powerRatingW || device.power || 0,
-      deviceId
+      wattage: device.wattage || device.additionalSpecs?.powerRatingW || device.power || 0,
+      deviceType: device.deviceType,
     };
 
     const updatedDevices = [...selectedDevices, newDevice];
     setSelectedDevices(updatedDevices);
 
-    // Save state to localStorage before navigating
-    localStorage.setItem("userDevices", JSON.stringify(updatedDevices));
-    localStorage.setItem("energyData", JSON.stringify({
-      monthlyCost,
-      pricePerKwh,
-      preferredBudget,
-      currency: currency.code,
-      currencySymbol: currency.symbol,
-      location: locationDisplay,
-    }));
+    // Update devices in centralized storage
+    updateUserDevices(updatedDevices);
+
+    // Update energy costs in centralized storage if all fields are present
+    if (monthlyCost && pricePerKwh && preferredBudget) {
+      updateUserEnergyCosts({
+        monthlyCost: parseFloat(monthlyCost),
+        pricePerKwh: parseFloat(pricePerKwh),
+        preferredBudget: parseFloat(preferredBudget),
+        currency: currency.code,
+        currencySymbol: currency.symbol,
+      });
+    }
+    setShowDeviceModal(false);
   };
 
   const handleProceed = () => {
-    // Calculate
-    const monthlyPurchase = parseFloat(monthlyCost);
-    const price = parseFloat(pricePerKwh);
-    const availableKwhPerMonth = monthlyPurchase / price;
-
-    // Prepare energy cost data (removed powerHoursPerDay, availableKwhPerMonth)
+    // Prepare energy cost data
     const energyData = {
       monthlyCost: parseFloat(monthlyCost),
       pricePerKwh: parseFloat(pricePerKwh),
@@ -130,13 +132,13 @@ export default function EnergyCostSetup() {
     const devicesData = selectedDevices.map(device => {
       const deviceId = device.id || generateDeviceId(device.customName || device.productName, existingIds);
       existingIds.push(deviceId); // Track to avoid duplicates
-      
+
       return {
         id: deviceId,
         customName: device.customName || device.productName,
         originalName: device.productName,
         deviceType: device.deviceType,
-        wattage: device.energyStarSpecs?.powerRatingW || device.additionalSpecs?.powerRatingW || device.power || 0,
+        wattage: device.wattage || device.energyStarSpecs?.powerRatingW || device.additionalSpecs?.powerRatingW || device.power || 0,
         priority: device.priority || 0,
         survey: device.survey || {
           frequency: "daily",
@@ -346,7 +348,7 @@ export default function EnergyCostSetup() {
           transition={{ delay: 0.3 }}
           whileTap={{ scale: 0.98 }}
         >
-          {selectedDevices.length === 0 ? "Scan Available Devices" : `Scan More Devices(${ selectedDevices.length } added)`}
+          {selectedDevices.length === 0 ? "Scan Available Devices" : `Scan More Devices(${selectedDevices.length} added)`}
         </motion.button>
 
         {selectedDevices.length > 0 && (
@@ -406,7 +408,7 @@ function SwipeableDeviceItem({ device, onRemove }: { device: any, onRemove: () =
       <div className="bg-white/50 backdrop-blur-sm border border-white/60 rounded-2xl p-4 flex items-center justify-between relative z-10">
         <div>
           <p className="text-sm">{device.customName || device.name}</p>
-          <p className="text-xs text-black/50">{device.customName ? device.name : `${ device.power } W`}</p>
+          <p className="text-xs text-black/50">{device.customName ? device.name : `${device.power} W`}</p>
         </div>
         <div className="w-2 h-2 bg-green-500 rounded-full" />
       </div>

@@ -18,6 +18,7 @@ export interface DeviceData {
     wattage: number;
     priority: number;
     hoursPerDay: number;
+    frequency: string; // daily, weekends, frequently, etc.
     usageTimes: string[];
 }
 
@@ -88,17 +89,19 @@ export class PreAnalysisData {
             }
 
             // Filter and map devices
-            this.devices = userData.devices
-                .filter((d: any) => deviceIds.includes(d.id))
-                .map((device: any) => ({
-                    id: device.id,
-                    name: device.customName || device.originalName,
-                    type: device.deviceType,
-                    wattage: device.wattage,
-                    priority: device.priority || 3,
-                    hoursPerDay: device.survey?.hoursPerDay || 8,
-                    usageTimes: device.survey?.usageTimes || []
-                }));
+            const selectedDevices = userData.devices
+                .filter((d: any) => deviceIds.includes(d.id));
+
+            this.devices = selectedDevices.map((device: any) => ({
+                id: device.id,
+                name: device.customName || device.originalName || device.name || 'Unknown Device',
+                type: device.deviceType || device.type || 'Unknown',
+                wattage: device.wattage || 0,
+                priority: device.priority || 3,
+                hoursPerDay: device.survey?.hoursPerDay || 0,
+                frequency: device.survey?.frequency || 'daily', // Add frequency from survey
+                usageTimes: device.survey?.usageTimes || []
+            }));
 
             if (this.devices.length === 0) {
                 throw new Error('No devices selected for analysis');
@@ -125,7 +128,7 @@ export class PreAnalysisData {
                 averageMonthlyCost: userData.energyCosts.monthlyCost || 0,
                 preferredBudget: userData.energyCosts.preferredBudget || userData.energyCosts.monthlyCost || 0,
                 pricePerKwh: userData.energyCosts.pricePerKwh || 50,
-                currencySymbol: userData.energyCosts.currencySymbol || '₦'
+                currencySymbol: userData.energyCosts.currencySymbol || '$'
             };
 
             console.log(`   Budget: Avg=₦${this.budget.averageMonthlyCost}, Pref=₦${this.budget.preferredBudget}, Rate=₦${this.budget.pricePerKwh}/kWh`);

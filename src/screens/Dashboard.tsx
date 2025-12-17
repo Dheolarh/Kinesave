@@ -3,7 +3,7 @@ import { useNavigate } from "react-router";
 import BottomNav from "../components/BottomNav";
 import FloatingAIRing from "../components/FloatingAIRing";
 import AddDeviceModal from "../components/AddDeviceModal";
-import { getCurrentUserId, getUserData, updateUserDevices, updateUserLocation } from "../utils/user-storage";
+import { getCurrentUserId, getUserData, getUserPlans, updateUserDevices, updateUserLocation, updateUserPlans } from "../utils/user-storage";
 import { searchLocation, getWeatherData } from "../utils/location";
 import type { LocationSearchResult } from "../utils/location";
 import { Plus, CloudSun, X, MapPin, Bell, TrendingDown } from "lucide-react";
@@ -62,22 +62,19 @@ export default function Dashboard() {
   // Helper function to check if device is in active plan
   const isDeviceInActivePlan = (deviceId: string): boolean => {
     try {
-      const savedPlan = localStorage.getItem("activePlan");
-      if (!savedPlan) return false;
+      const plansData = getUserPlans();
+      if (!plansData?.activePlan) return false;
 
-      const plan = JSON.parse(savedPlan);
-
-      // Get the full plan details from aiGeneratedPlans
-      const savedPlans = localStorage.getItem('aiGeneratedPlans');
-      if (!savedPlans) return false;
-
-      const plansData = JSON.parse(savedPlans);
       let fullPlan = null;
 
-      // Map plan ID to full plan data
-      if (plan.id === '1') fullPlan = plansData.costSaver;
-      else if (plan.id === '2') fullPlan = plansData.ecoMode;
-      else if (plan.id === '3') fullPlan = plansData.comfortBalance;
+      // Map activePlan type to plan data
+      if (plansData.activePlan === 'cost') {
+        fullPlan = plansData.costSaver;
+      } else if (plansData.activePlan === 'eco') {
+        fullPlan = plansData.ecoMode;
+      } else if (plansData.activePlan === 'balance') {
+        fullPlan = plansData.comfortBalance;
+      }
 
       if (!fullPlan || !fullPlan.devices) return false;
 
@@ -93,34 +90,54 @@ export default function Dashboard() {
     try {
       setLoading(true);
 
-      // Load complete user profile from localStorage
       const userData = getUserData();
-
       if (!userData) {
-        console.error("No user profile found");
-        setLoading(false);
+        console.log('No user data found');
         return;
       }
 
-      // Set location
+      // Load devices
+      const devicesData = userData.devices || [];
+      setDevices(devicesData);
+
+      // Load location
       if (userData.location) {
         setLocation(userData.location);
       }
 
-      // Set devices  
-      if (userData.devices) {
-        setDevices(userData.devices);
+      // Load active plan from new centralized storage
+      const plansData = getUserPlans();
+      if (plansData?.activePlan) {
+        let planId = '';
+        let planData: any = null;
+
+        // Map activePlan type to plan data
+        if (plansData.activePlan === 'cost') {
+          planId = '1';
+          planData = plansData.costSaver;
+        } else if (plansData.activePlan === 'eco') {
+          planId = '2';
+          planData = plansData.ecoMode;
+        } else if (plansData.activePlan === 'balance') {
+          planId = '3';
+          planData = plansData.comfortBalance;
+        }
+
+        if (planData) {
+          setActivePlan({
+            id: planId,
+            name: planData.name,
+            type: planData.type,
+            savings: planData.metrics?.monthlySaving ||
+              planData.metrics?.ecoImprovementPercentage ||
+              planData.metrics?.budgetReductionPercentage || 0
+          });
+        }
       }
 
-      // Load active plan (still from localStorage for now)
-      const savedPlan = localStorage.getItem("activePlan");
-      if (savedPlan) {
-        setActivePlan(JSON.parse(savedPlan));
-      }
+      console.log('Dashboard data loaded');
     } catch (error) {
-      console.error("Failed to load data:", error);
-    } finally {
-      setLoading(false);
+      console.error('Failed to load dashboard data:', error);
     }
   };
 
@@ -190,8 +207,8 @@ export default function Dashboard() {
 
     setIsDeleting(true);
     try {
-      // Remove active plan from localStorage
-      localStorage.removeItem("activePlan");
+      // Remove active plan from centralized storage
+      updateUserPlans({ activePlan: null });
 
       // Update UI
       setActivePlan(null);
@@ -309,11 +326,18 @@ export default function Dashboard() {
           <div className="px-3 pt-2 pb-4">
             <div className="flex items-center justify-between mb-2">
               <h1
-                className="text-2xl tracking-tight flex-shrink-0"
+                className="text-2xl tracking-tight"
+                style={showUserId ? {
+                  maxWidth: '50vw',
+                  overflowX: 'auto',
+                  display: 'block',
+                  WebkitOverflowScrolling: 'touch',
+                  cursor: 'grab'
+                } : {}}
                 onDoubleClick={() => setShowUserId(!showUserId)}
               >
                 {showUserId ? (
-                  <div className="font-mono text-base overflow-x-auto max-w-[8rem] whitespace-nowrap">{userId}</div>
+                  <div className="font-mono text-base whitespace-nowrap">{userId}</div>
                 ) : (
                   "My Devices"
                 )}
@@ -360,22 +384,20 @@ export default function Dashboard() {
         {/* Active Plan Card - Only show if user has an active plan */}
         {activePlan && (() => {
           // Get full plan data to access metrics
-          const savedPlans = localStorage.getItem('aiGeneratedPlans');
+          const plansData = getUserPlans();
           let fullPlan = null;
           let currencySymbol = '$';
 
-          if (savedPlans) {
+          if (plansData) {
             try {
-              const plansData = JSON.parse(savedPlans);
               if (activePlan.id === '1') fullPlan = plansData.costSaver;
               else if (activePlan.id === '2') fullPlan = plansData.ecoMode;
               else if (activePlan.id === '3') fullPlan = plansData.comfortBalance;
 
               // Get currency symbol
-              const energyData = localStorage.getItem('energyData');
-              if (energyData) {
-                const data = JSON.parse(energyData);
-                currencySymbol = data.currencySymbol || '$';
+              const userData = getUserData();
+              if (userData?.energyCosts) {
+                currencySymbol = userData.energyCosts.currencySymbol || '$';
               }
             } catch (error) {
               console.error('Error loading plan details:', error);
@@ -413,7 +435,7 @@ export default function Dashboard() {
                         <div>
                           <p className="text-xs text-black/50 mb-1">Optimized Budget</p>
                           <p className="text-sm tracking-tight text-green-600">
-                            {currencySymbol}{fullPlan.metrics.optimizedBudget || 0}
+                            {currencySymbol}{Math.trunc(fullPlan.metrics.optimizedBudget || 0)}
                           </p>
                         </div>
                       </>
@@ -424,13 +446,13 @@ export default function Dashboard() {
                         <div>
                           <p className="text-xs text-black/50 mb-1">Eco Gain</p>
                           <p className="text-sm tracking-tight text-green-600">
-                            +{fullPlan.metrics.ecoImprovementPercentage || 0}%
+                            {fullPlan.metrics.ecoImprovementPercentage || 0}%
                           </p>
                         </div>
                         <div>
-                          <p className="text-xs text-black/50 mb-1">Monthly Cost Cap</p>
+                          <p className="text-xs text-black/50 mb-1">Monthly Cost</p>
                           <p className="text-sm tracking-tight">
-                            {currencySymbol}{fullPlan.metrics.monthlyCostCap || 0}
+                            {currencySymbol}{Math.trunc(fullPlan.metrics.monthlyCostCap || 0)}
                           </p>
                         </div>
                       </>
@@ -439,15 +461,15 @@ export default function Dashboard() {
                     {fullPlan?.type === 'balance' && (
                       <>
                         <div>
-                          <p className="text-xs text-black/50 mb-1">Budget Reduction</p>
-                          <p className="text-sm tracking-tight">
-                            -{fullPlan.metrics.budgetReductionPercentage || 0}%
+                          <p className="text-xs text-black/50 mb-1">Eco Gain</p>
+                          <p className="text-sm tracking-tight text-green-600">
+                            {fullPlan.metrics.ecoFriendlyGainPercentage || 0}%
                           </p>
                         </div>
                         <div>
-                          <p className="text-xs text-black/50 mb-1">Eco Gain</p>
-                          <p className="text-sm tracking-tight text-green-600">
-                            +{fullPlan.metrics.ecoFriendlyGainPercentage || 0}%
+                          <p className="text-xs text-black/50 mb-1">Optimized Budget</p>
+                          <p className="text-sm tracking-tight">
+                            {currencySymbol}{Math.trunc(fullPlan.metrics.optimizedBudget || 0)}
                           </p>
                         </div>
                       </>

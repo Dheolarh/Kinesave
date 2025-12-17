@@ -41,6 +41,7 @@ export default function PlanDetails() {
     const [loading, setLoading] = useState(true);
     const [deviceNames, setDeviceNames] = useState<Record<string, any>>({});
     const [currencySymbol, setCurrencySymbol] = useState('$');
+    const [isActivePlan, setIsActivePlan] = useState(false);
 
 
     // Load AI plan and device names from new storage
@@ -54,11 +55,19 @@ export default function PlanDetails() {
                 }
 
                 let selectedPlan: AIPlan | null = null;
+                let planType = '';
 
                 // Map ID to plan type
-                if (id === '1') selectedPlan = plansData.costSaver;
-                else if (id === '2') selectedPlan = plansData.ecoMode;
-                else if (id === '3') selectedPlan = plansData.comfortBalance;
+                if (id === '1') {
+                    selectedPlan = plansData.costSaver;
+                    planType = 'cost';
+                } else if (id === '2') {
+                    selectedPlan = plansData.ecoMode;
+                    planType = 'eco';
+                } else if (id === '3') {
+                    selectedPlan = plansData.comfortBalance;
+                    planType = 'balance';
+                }
 
                 if (!selectedPlan) {
                     navigate('/plans');
@@ -66,6 +75,9 @@ export default function PlanDetails() {
                 }
 
                 setPlan(selectedPlan);
+
+                // Check if this is the active plan
+                setIsActivePlan(plansData.activePlan === planType);
 
                 // Load device names from new storage
                 const userData = getUserData();
@@ -103,27 +115,28 @@ export default function PlanDetails() {
         if (!plan) return { label1: "", value1: `${currencySymbol}0`, label2: "", value2: "0%" };
 
         const metrics = plan.metrics as any;
+        const userData = getUserData(); // Added to access data.budget.averageMonthlyCost
 
-        if (plan.type === 'cost') {
+        if (plan?.type === 'cost') {
             return {
-                label1: "Monthly Savings",
-                value1: `${currencySymbol}${Math.trunc(metrics.monthlySaving || 0)} `,
-                label2: "Efficiency Gain",
-                value2: `${Math.trunc((metrics.monthlySaving / (metrics.initialBudget || 1)) * 100)}% `
+                label1: "Initial Monthly Cost",
+                value1: `${currencySymbol}${Math.trunc(userData?.energyCosts?.monthlyCost || 0)} `,
+                label2: "Cost Saved",
+                value2: `${currencySymbol}${Math.trunc(metrics.monthlySaving || 0)} `
             };
         } else if (plan.type === 'eco') {
             return {
                 label1: "Eco Gain",
-                value1: `+ ${Math.trunc(metrics.ecoImprovementPercentage || 0)}% `,
-                label2: "Monthly Cost Cap",
+                value1: `${Math.trunc(metrics.ecoImprovementPercentage || 0)}% `,
+                label2: "Monthly Cost",
                 value2: `${currencySymbol}${Math.trunc(metrics.monthlyCostCap || 0)} `
             };
         } else {
             return {
-                label1: "Budget Reduction",
-                value1: `${Math.trunc(metrics.budgetReductionPercentage || 0)}% `,
-                label2: "Eco Gain",
-                value2: `+ ${Math.trunc(metrics.ecoFriendlyGainPercentage || 0)}% `
+                label1: "Actual Cost",
+                value1: `${currencySymbol}${Math.trunc(metrics.actualMonthlyCost || 0)} `,
+                label2: "Optimized Budget",
+                value2: `${currencySymbol}${Math.trunc(metrics.optimizedBudget || 0)} `
             };
         }
     };
@@ -200,9 +213,15 @@ export default function PlanDetails() {
 
     // Handle date selection
     const handleDateSelect = (date: Date | undefined) => {
+        // If date is undefined (clicking already-selected date), reopen modal with current selection
+        if (!date && selectedDate) {
+            setShowModal(true);
+            return;
+        }
+
         if (!date) return;
 
-        // Always set the date and show modal (even if same date is clicked)
+        // Set the date and show modal
         setSelectedDate(date);
         setShowModal(true);
     };
@@ -380,10 +399,11 @@ export default function PlanDetails() {
             <div className="fixed bottom-24 left-0 right-0 px-5 pb-2 bg-gradient-to-t from-gray-100 via-gray-100 to-transparent pt-6 z-30">
                 <button
                     onClick={handleSelect}
-                    disabled={selected}
-                    className="w-full py-3.5 bg-black text-white rounded-full text-sm tracking-wide hover:bg-black/90 transition-colors disabled:opacity-50 shadow-lg"
+                    disabled={selected || isActivePlan}
+                    className="w-full py-3.5 bg-black text-white rounded-full text-sm tracking-wide hover:bg-black/90 transition-colors shadow-lg"
+                    style={isActivePlan ? { opacity: 0.3 } : {}}
                 >
-                    {selected ? "Plan Selected" : "Select This Plan"}
+                    {isActivePlan ? "Already in Use" : selected ? "Plan Selected" : "Select This Plan"}
                 </button>
             </div>
 
@@ -431,9 +451,11 @@ export default function PlanDetails() {
                                         <div className="w-10 h-10 bg-white/50 backdrop-blur-sm border border-white/60 rounded-xl flex items-center justify-center">
                                             {getWeatherIcon(dailySchedule.weather.condition)}
                                         </div>
-                                        <div>
-                                            <div className="text-sm">{dailySchedule.weather.condition}</div>
-                                            <div className="text-xs text-black/50">Estimated Weather</div>
+                                        <div className="flex-1">
+                                            <div className="text-sm font-medium">{dailySchedule.weather.condition}</div>
+                                            <div className="text-xs text-black/50">
+                                                {dailySchedule.weather.temperature}°C • {dailySchedule.weather.humidity}% humidity
+                                            </div>
                                         </div>
                                     </div>
                                 )}
@@ -459,23 +481,25 @@ export default function PlanDetails() {
                                     <div className="bg-white/60 backdrop-blur-xl border border-white/60 rounded-2xl p-4 shadow-lg">
                                         <div className="text-xl mb-1">
                                             {(() => {
-                                                const energyData = localStorage.getItem('energyData');
-                                                const pricePerKwh = energyData ? JSON.parse(energyData).pricePerKwh : 36;
+                                                const userData = getUserData();
+                                                const pricePerKwh = userData?.energyCosts?.pricePerKwh || 36;
                                                 const currSym = currencySymbol;
 
                                                 const deviceKeys = Object.keys(dailySchedule || {}).filter(k => !['dayNumber', 'date', 'day', 'weather'].includes(k));
                                                 let totalCost = 0;
                                                 deviceKeys.forEach(deviceId => {
                                                     const usage = (dailySchedule as any)[deviceId];
-                                                    if (usage && typeof usage === 'object' && usage.usage) {
-                                                        const kwhUsed = (150 * usage.usage) / 1000;
-                                                        totalCost += kwhUsed * parseFloat(pricePerKwh);
+                                                    if (usage && usage.usage && deviceNames[deviceId]) {
+                                                        const deviceWattage = deviceNames[deviceId].wattage || 150;
+                                                        const kwhUsed = (deviceWattage * usage.usage) / 1000;
+                                                        totalCost += kwhUsed * pricePerKwh;
                                                     }
                                                 });
+
                                                 return `${currSym}${totalCost.toFixed(2)}`;
                                             })()}
                                         </div>
-                                        <div className="text-xs text-black/50">Estimated Cost</div>
+                                        <div className="text-xs text-black/50">Estimated Daily Cost</div>
                                     </div>
                                 </div>
 

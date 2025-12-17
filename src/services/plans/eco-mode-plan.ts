@@ -1,313 +1,285 @@
 /**
- * Eco Mode Plan Generator
+ * Eco Mode Plan Generator (Hybrid Architecture)
  * 
- * Goal: Minimize environmental impact (pollution/emissions)
- * Budget: Average Monthly Cost ÷ 30
- * Strategy: Pollution-based device levels with weather filtering
+ * AI Role: Suggest eco-optimized hours + rate devices by environmental impact
+ * System Role: Trim hours to fit budget while prioritizing low-emission devices
  */
 
-import { PreAnalysisData, } from '../pre-analysis-data';
+import { PreAnalysisData } from '../pre-analysis-data';
 import bedrockService from '../bedrock.service';
 import { AIPlan } from '../../types/ai-plan.types';
-import { DailyBudget } from './cost-saver-plan';
+import { trimToFitBudget, validateTrimmedBudget, getTrimmingSummary, type DeviceHours } from '../../utils/budget-trimmer';
 
 export class EcoModePlan {
 
     /**
-     * Calculate daily budgets for 30 days
-     * Eco Mode uses: Average Monthly Cost ÷ 30
+     * Generate Eco Mode plan
      */
-    monthCostBreakdown(data: PreAnalysisData): DailyBudget[] {
+    async generate(data: PreAnalysisData): Promise<AIPlan> {
+        console.log('\n🟢 === ECO MODE PLAN (Hybrid: AI Hours + Eco + Trim) ===');
+
+        // Use average monthly cost for eco mode
         const dailyBudget = data.budget.averageMonthlyCost / 30;
+        const targetBudget = dailyBudget; // Stay within average budget
 
         console.log(`🌱 Eco Mode: Daily budget = ${data.budget.currencySymbol}${dailyBudget.toFixed(2)}`);
+        console.log(`🎯 Eco Mode: Target = ${data.budget.currencySymbol}${targetBudget.toFixed(2)}`);
 
-        return Array(30).fill(null).map((_, i) => ({
-            day: i + 1,
-            budget: dailyBudget
-        }));
-    }
+        // Step 1: Get AI eco ratings + suggested hours
+        const aiResponse = await this.getEcoOptimizedHours(data);
 
-    /**
-     * Build AI prompt for eco optimization
-     */
-    prompter(data: PreAnalysisData, dailyBudgets: DailyBudget[]): string {
-        const dailyBudget = dailyBudgets[0].budget;
-        const targetBudget = dailyBudget * 0.95; // -5% of budget
-        const { currencySymbol, pricePerKwh } = data.budget;
+        // Step 2: Trim each day to fit budget (with eco priority)
+        const dailySchedules = this.trimWithEcoPriority(aiResponse, data, targetBudget);
 
-        const deviceList = data.devices.map((d, i) =>
-            `${i + 1}. ID: "${d.id}"
-   Type: ${d.type}
-   Wattage: ${d.wattage}W
-   Priority: ${d.priority}
-   User's normal usage: ${d.hoursPerDay}h/day`
-        ).join('\n\n');
+        // Step 3: Generate eco tips
+        const smartAlerts = this.generateEcoTips(data.devices, aiResponse.ratings);
 
-        const weatherByDay = data.weather.map((w, i) =>
-            `Day ${i + 1}: ${w.condition}, ${w.avgTemp}°C, Humidity: ${w.humidity}%`
-        ).join('\n');
+        // Step 4: Calculate eco metrics
+        const avgEcoScore = dailySchedules.reduce((sum, day) => sum + (day.ecoScore || 0), 0) / 30;
+        const avgDailyCost = dailySchedules.reduce((sum, day) => sum + day.totalCost, 0) / 30;
 
-        return `You are an AI energy optimizer generating an ECO MODE plan for 30 days.
+        // Step 5: Calculate eco gain percentage
+        const ecoGain = this.calculateEcoGain(data.devices, dailySchedules);
 
-BUDGET CONSTRAINT:
-- Daily budget: ${currencySymbol}${dailyBudget.toFixed(2)} (from average monthly cost)
-- TARGET: Aim for ${currencySymbol}${targetBudget.toFixed(2)} per day (at least -5% under budget)
-- Price per kWh: ${currencySymbol}${pricePerKwh}
-
-DEVICES (${data.devices.length} total):
-${deviceList}
-
-WEATHER (30 days):
-${weatherByDay}
-
-===================================
-CALCULATION FORMULA FOR ALLOCATION:
-===================================
-
-**Device Daily Cost Formula:**
-Daily Cost = (Device Wattage ÷ 1000) × Hours × ${currencySymbol}${pricePerKwh}/kWh
-
-**Example Calculation:**
-- Device: AC (1500W)
-- Hours: 4h
-- Cost = (1500 ÷ 1000) × 4 × ${pricePerKwh} = ${(1.5 * 4 * data.budget.pricePerKwh).toFixed(2)} ${currencySymbol}
-
-**Budget Allocation Strategy:**
-1. Calculate each device's cost at different hour levels (1h, 2h, 3h, etc.)
-2. Start with low hours for all devices
-3. Incrementally add hours to devices based on pollution level and priority
-4. Stop when daily total reaches target budget (${currencySymbol}${targetBudget.toFixed(2)})
-
-===================================
-STEP-BY-STEP ANALYSIS PROCESS:
-===================================
-
-STEP 1: DEVICE TYPE CLASSIFICATION
-Analyze each device by TYPE only:
-- Weather-dependent: AC, Heater, Fan
-- Always-needed: Refrigerator, Freezer, Lights, Laptop, TV, etc.
-
-STEP 2: INITIAL ALLOCATION
-Allocate ALL devices to EACH day initially.
-
-STEP 3: WEATHER CHECK (Day-by-Day)
-For EACH day, check the weather temperature and condition.
-
-STEP 4: WEATHER-BASED FILTERING
-For EACH day, filter devices based on weather REGARDLESS of priority:
-- If temp ≥ 30°C: Keep AC, remove Heater
-- If temp ≤ 18°C: Keep Heater, remove AC
-- If 18°C < temp < 30°C: Remove both AC and Heater, keep Fan
-- Weather-independent devices: Keep on ALL days
-
-⚠️ CRITICAL: Each day will have DIFFERENT weather, so device lists and hours MUST VARY per day!
-DO NOT copy day1 to all other days. Weather changes = different devices and hours.
-
-STEP 5: POLLUTION LEVEL CLASSIFICATION
-Classify remaining devices by environmental pollution level:
-
-**HIGH POLLUTION (Level 3):**
-- AC (CFCs cause global warming, high energy consumption)
-- Heater (high energy, emissions)
-- Dryer (high energy)
-- Water Heater (high energy)
-
-**MEDIUM POLLUTION (Level 2):**
-- Refrigerator (CFCs but necessary)
-- Freezer (CFCs but necessary)
-- Washing Machine (water & energy usage)
-- Microwave (moderate energy)
-- Oven (moderate to high energy)
-
-**LOW POLLUTION (Level 1):**
-- LED Lights (minimal energy)
-- Laptop (low energy)
-- Phone Charger (minimal energy)
-- Fan (low energy)
-- TV (moderate but acceptable)
-
-STEP 6: ECO-BASED HOUR ALLOCATION
-Allocate hours based on pollution level (NOT device priority):
-
-a) **HIGH POLLUTION devices (Level 3):**
-   - Get MINIMAL hours (20-40% of user's normal usage)
-   - Example: If user uses AC 8h/day → Give 2-3h MAX
-   
-b) **MEDIUM POLLUTION devices (Level 2):**
-   - Get MODERATE hours (50-70% of user's normal usage)
-   - Example: If user uses Fridge 24h/day → Give 12-16h
-   
-c) **LOW POLLUTION devices (Level 1):**
-   - Get MAXIMUM hours (80-100% of user's normal usage)
-   - Example: If user uses Laptop 6h/day → Give 5-6h
-
-d) **Use the calculation formula to ensure total cost ≤ ${currencySymbol}${targetBudget.toFixed(2)}**
-   - Calculate cost for each device at allocated hours
-   - Reduce high-pollution device hours first if over budget
-   - NO device runs 24 hours
-
-STEP 7: SMART TIPS GENERATION
-Generate ONE eco-focused tip for EACH unique device.
-Tips should focus on environmental impact reduction.
-Maximum 15 words per tip.
-
-===================================
-OUTPUT FORMAT (JSON):
-===================================
-
-{
-  "plan": {
-    "day1": {
-      "devices": {
-        "device_id_1": {
-          "hours": 2.5,
-          "cost": 22.50,
-          "pollutionLevel": 3
-        },
-        "device_id_2": {
-          "hours": 12.0,
-          "cost": 15.00,
-          "pollutionLevel": 2
-        }
-      },
-      "totalCost": 95.00,
-      "ecoScore": 82
-    },
-    "day2": {...},
-    ...
-    "day30": {...}
-  },
-  "deviceTips": {
-    "device_id_1": "Minimize AC usage during cooler hours to reduce carbon emissions.",
-    "device_id_2": "Keep refrigerator full to maintain temperature with less energy."
-  }
-}
-
-===================================
-CRITICAL RULES:
-===================================
-
-1. Device IDs must be EXACT (use quotes, no spaces)
-2. Every day's totalCost MUST be ≤ ${currencySymbol}${targetBudget.toFixed(2)}
-3. NO device runs 24 hours
-4. Filter devices by TYPE vs weather (same as Cost Saver)
-5. Pollution level (NOT priority) determines hours allocated
-6. HIGH pollution devices get MINIMAL hours (20-40%)
-7. MEDIUM pollution devices get MODERATE hours (50-70%)
-8. LOW pollution devices get MAXIMUM hours (80-100%)
-9. Use calculation formula to stay under budget
-10. Generate exactly ONE tip per unique device
-11. Tips must be ≤ 15 words and eco-focused
-12. Include pollutionLevel (1, 2, or 3) for each device
-13. Include ecoScore (0-100) for each day
-14. Return ONLY valid JSON
-
-Return ONLY the JSON object. NO explanations or markdown.`;
-    }
-
-    /**
-     * Call Bedrock AI and retrieve response
-     */
-    async resultRetriever(prompt: string): Promise<any> {
-        console.log('🤖 Eco Mode: Calling AI...');
-
-        const systemPrompt = `You are an expert environmental energy optimizer.
-Prioritize pollution reduction over user convenience.
-Classify devices by pollution level, not user priority.
-Follow the calculation formula to stay under budget.
-Filter by weather conditions.
-Return ONLY valid JSON matching the specified structure.`;
-
-        const response = await bedrockService.getJSONResponse(prompt, systemPrompt);
-
-        console.log('✅ Eco Mode: AI response received');
-        return response;
-    }
-
-    /**
-     * Format AI response for frontend
-     */
-    resultRenderer(aiResponse: any, data: PreAnalysisData): AIPlan {
-        console.log('🎨 Eco Mode: Rendering result...');
-
-        const dailySchedules: any[] = [];
-        const dailyTips: any[] = [];
-        let totalOptimizedCost = 0;
-        let avgEcoScore = 0;
-
-        for (let day = 1; day <= 30; day++) {
-            const dayData = aiResponse.plan[`day${day}`];
-            if (!dayData) continue;
-
-            const weather = data.weather[day - 1];
-            const schedule: any = {};
-
-            for (const [deviceId, allocation] of Object.entries(dayData.devices || {})) {
-                const cleanId = deviceId.trim();
-                schedule[cleanId] = {
-                    usage: Math.round(((allocation as any).hours || 0) * 100) / 100,
-                    cost: Math.round(((allocation as any).cost || 0) * 100) / 100,
-                    pollutionLevel: (allocation as any).pollutionLevel || 2
-                };
-            }
-
-            schedule.dayNumber = day;
-            schedule.date = new Date(Date.now() + (day - 1) * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-            schedule.weather = weather;
-            schedule.totalUsageHours = Math.round(Object.values(dayData.devices || {}).reduce((sum: number, d: any) => sum + (d.hours || 0), 0) * 100) / 100;
-            schedule.estimatedCost = Math.round((dayData.totalCost || 0) * 100) / 100;
-            schedule.ecoScore = Math.round(dayData.ecoScore || 75);
-
-            dailySchedules.push(schedule);
-            totalOptimizedCost += schedule.estimatedCost;
-            avgEcoScore += schedule.ecoScore;
-        }
-
-        avgEcoScore = avgEcoScore / 30;
-
-        // Parse device tips
-        const deviceTips = aiResponse.deviceTips || {};
-        for (const [deviceId, tip] of Object.entries(deviceTips)) {
-            dailyTips.push({
-                deviceId: deviceId.trim(),
-                tip: (tip as string).substring(0, 100)
-            });
-        }
-
-        console.log(`✅ Eco Mode: Avg eco score = ${avgEcoScore.toFixed(1)}/100`);
-        console.log(`✅ Eco Mode: Generated ${dailyTips.length} eco tips`);
+        console.log(`✅ Eco Mode complete: Avg eco score ${avgEcoScore.toFixed(1)}/100, Eco gain: ${ecoGain.toFixed(1)}%, Cost: ₦${avgDailyCost.toFixed(2)}/day`);
 
         return {
-            id: `eco-mode-${Date.now()}`,
-            type: 'eco',
+            id: 'eco-mode',
             name: 'Eco Mode',
-            description: 'Minimize environmental impact with pollution-based energy management',
-            dailySchedules,
+            type: 'eco',
+            description: 'Environmentally optimized plan minimizing carbon emissions',
             devices: data.devices.map(d => d.id),
+            dailySchedules,
+            smartAlerts,
+            dailyTips: [],
             metrics: {
-                initialEcoScore: 50,
-                optimizedEcoScore: Math.round(avgEcoScore * 10) / 10,
-                ecoImprovementPercentage: Math.round(((avgEcoScore - 50) / 50) * 1000) / 10,
-                monthlyCostCap: Math.round(totalOptimizedCost * 100) / 100
-            },
-            dailyTips,
-            smartAlerts: []
+                optimizedEcoScore: avgEcoScore,
+                ecoImprovementPercentage: ecoGain,
+                monthlyCostCap: avgDailyCost * 30
+            }
         };
     }
 
     /**
-     * Main entry point
+     * Get AI eco-optimized hours + device ratings
      */
-    async generate(data: PreAnalysisData): Promise<AIPlan> {
-        console.log('\n🟢 === ECO MODE PLAN ===');
+    private async getEcoOptimizedHours(data: PreAnalysisData): Promise<{
+        hours: { [day: string]: { [deviceId: string]: number } };
+        ratings: { [deviceId: string]: number };
+    }> {
+        const prompt = this.buildPrompt(data);
 
-        const budgets = this.monthCostBreakdown(data);
-        const prompt = this.prompter(data, budgets);
-        const aiResponse = await this.resultRetriever(prompt);
-        const plan = this.resultRenderer(aiResponse, data);
+        console.log('🤖 Calling AI for eco-optimized hours...');
 
-        console.log('✅ Eco Mode Plan complete\n');
-        return plan;
+        const systemPrompt = `You are an environmental efficiency expert. Suggest eco-optimized usage hours and rate devices by environmental impact. Return ONLY valid JSON.`;
+
+        const response = await bedrockService.getJSONResponse(prompt, systemPrompt);
+
+        console.log('✅ Eco hours + ratings received');
+
+        return {
+            hours: response.hours || {},
+            ratings: response.ratings || {}
+        };
+    }
+
+    /**
+     * Build AI prompt for eco-optimized hours
+     */
+    private buildPrompt(data: PreAnalysisData): string {
+        const deviceList = data.devices.map((d, i) =>
+            `${i + 1}. "${d.id}" - ${d.type}, ${d.wattage}W`
+        ).join('\n');
+
+        const weatherByDay = data.weather.map((w, i) =>
+            `Day ${i + 1}: ${w.condition}, ${w.avgTemp}°C`
+        ).join('\n');
+
+        return `Suggest ECO-OPTIMIZED usage hours for devices (30 days) + rate environmental impact.
+
+DEVICES:
+${deviceList}
+
+WEATHER:
+${weatherByDay}
+
+YOUR TASK: 
+1. Rate each device by environmental impact (0-100, higher = more eco-friendly)
+2. Suggest usage hours prioritizing low-emission devices
+
+EMISSION CLASSIFICATION:
+1. **Direct Emissions** (devices that directly produce pollutants):
+   - Electric Grills/Ovens: Carbon from cooking (40-60 score, minimize hours)
+   - Gas Appliances: Direct CO2, NOx (30-50 score, minimize hours)
+   - Old ACs: CFC leaks (35-55 score, minimize hours)
+
+2. **Indirect Emissions** (via electricity):
+   - High wattage = more coal/gas burned = more CO2
+   - Refrigerators/Freezers: CFC risks + constant power (60-75 score, 8-10h needed)
+   - AC units: High power + refrigerant leaks (45-65 score, only hot days)
+   - Heaters: Very high consumption (40-60 score, only cold days)
+
+3. **Low-Impact Devices** (prioritize these):
+   - LED lights: Minimal waste (90-100 score, maximize usage)
+   - Modern laptops: Energy efficient (80-95 score, normal usage)
+   - Fans: Low power, no refrigerants (85-95 score, prefer over AC)
+
+ECO HOUR GUIDELINES:
+- Prioritize low-emission devices (higher eco scores)
+- Use fans instead of AC when possible
+- Minimize high-wattage device hours
+- Avoid direct-emission devices when alternatives exist
+
+OUTPUT FORMAT (JSON):
+{
+  "ratings": {
+    "freezer": 65,
+    "laptop": 85,
+    "ac": 45,
+    "fan": 90,
+    "electric_grill": 40,
+    ...
+  },
+  "hours": {
+    "day1": {
+      "freezer": 8,
+      "laptop": 6,
+      "fan": 5,
+      "ac": 0,
+      "electric_grill": 0
+    },
+    "day2": { ... },
+    ...
+    "day30": { ... }
+  }
+}
+
+Rate AND suggest hours for ALL ${data.devices.length} devices across all 30 days.`;
+    }
+
+    /**
+     * Trim with eco priority (boost eco-friendly device priorities)
+     */
+    private trimWithEcoPriority(
+        aiResponse: { hours: any; ratings: any },
+        data: PreAnalysisData,
+        dailyBudget: number
+    ): any[] {
+        const schedules = [];
+
+        for (let dayNum = 1; dayNum <= 30; dayNum++) {
+            const dayKey = `day${dayNum}`;
+            const dayHours = aiResponse.hours[dayKey] || {};
+
+            // Boost priority for eco-friendly devices
+            const deviceHours: DeviceHours[] = data.devices.map(d => {
+                const ecoRating = aiResponse.ratings[d.id] || 50;
+                const ecoBoost = (ecoRating - 50) / 20; // -2.5 to +2.5
+                const ecoPriority = Math.max(1, Math.min(5, d.priority + ecoBoost));
+
+                return {
+                    id: d.id,
+                    hours: dayHours[d.id] || 0,
+                    wattage: d.wattage,
+                    priority: ecoPriority, // Eco-adjusted priority
+                    type: d.type
+                };
+            });
+
+            // Trim to fit budget
+            const trimmed = trimToFitBudget(deviceHours, dailyBudget, data.budget.pricePerKwh);
+
+            // Calculate eco score for active devices
+            let totalEcoScore = 0;
+            let activeDevices = 0;
+
+            const allDevicesSchedule: any = {};
+            data.devices.forEach(device => {
+                const deviceData = trimmed[device.id] || { hours: 0, cost: 0 };
+                allDevicesSchedule[device.id] = {
+                    usage: deviceData.hours,
+                    cost: deviceData.cost
+                };
+
+                if (deviceData.hours > 0) {
+                    totalEcoScore += aiResponse.ratings[device.id] || 50;
+                    activeDevices++;
+                }
+            });
+
+            const validation = validateTrimmedBudget(trimmed, dailyBudget);
+            const avgEcoScore = activeDevices > 0 ? totalEcoScore / activeDevices : 0;
+
+            schedules.push({
+                dayNumber: dayNum,
+                date: new Date(Date.now() + (dayNum - 1) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                day: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'][(dayNum - 1) % 7],
+                weather: {
+                    condition: data.weather[dayNum - 1]?.condition || 'Clear',
+                    temperature: data.weather[dayNum - 1]?.avgTemp || 25,
+                    humidity: data.weather[dayNum - 1]?.humidity || 50,
+                    weatherCode: data.weather[dayNum - 1]?.weatherCode || 0
+                },
+                ...allDevicesSchedule,
+                totalCost: validation.totalCost,
+                ecoScore: Math.round(avgEcoScore)
+            });
+
+            if (dayNum <= 3) {
+                console.log(`Day ${dayNum}: ${getTrimmingSummary(trimmed)} | Eco: ${avgEcoScore.toFixed(1)}`);
+            }
+        }
+
+        return schedules;
+    }
+
+    /**
+     * Generate eco tips
+     */
+    private generateEcoTips(devices: any[], ecoRatings: { [id: string]: number }): any[] {
+        const tips = devices
+            .sort((a, b) => (ecoRatings[a.id] || 50) - (ecoRatings[b.id] || 50))
+            .slice(0, 4)
+            .map(device => ({
+                message: `Replace ${device.name} with energy-efficient alternative to reduce emissions`,
+                deviceId: device.id
+            }));
+
+        return tips;
+    }
+
+    /**
+     * Calculate eco gain percentage
+     * 
+     * Formula:
+     * - Original hours = sum of normal device hours × 30 days
+     * - Subsidized hours = sum of actual hours across all 30 days
+     * - Eco gain = abs((subsidized - original) / original) × 100
+     */
+    private calculateEcoGain(devices: any[], dailySchedules: any[]): number {
+        // Calculate original total hours (normal usage × 30 days)
+        const originalDailyHours = devices.reduce((sum, device) => sum + (device.hoursPerDay || 0), 0);
+        const originalTotalHours = originalDailyHours * 30;
+
+        // Calculate subsidized total hours (sum of actual hours across all days)
+        let subsidizedTotalHours = 0;
+
+        dailySchedules.forEach(day => {
+            devices.forEach(device => {
+                const deviceData = day[device.id];
+                if (deviceData && deviceData.usage) {
+                    subsidizedTotalHours += deviceData.usage;
+                }
+            });
+        });
+
+        // Calculate eco gain percentage
+        if (originalTotalHours === 0) return 0;
+
+        const ecoGain = Math.abs((subsidizedTotalHours - originalTotalHours) / originalTotalHours) * 100;
+
+        console.log(`Eco gain: Original ${originalTotalHours}h, Subsidized ${subsidizedTotalHours}h, Gain: ${ecoGain.toFixed(1)}%`);
+
+        return Math.round(ecoGain);
     }
 }

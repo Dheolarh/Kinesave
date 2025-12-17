@@ -1,281 +1,211 @@
 /**
- * Cost Saver Plan Generator
+ * Cost Saver Plan Generator (Hybrid Architecture)
  * 
- * Goal: Stay strictly UNDER the user's preferred budget (aim for -5%)
- * Strategy: Smart device allocation based on type, weather, and priority
+ * AI Role: Suggest usage hours for all devices based on weather/priority
+ * System Role: Trim hours to fit budget using intelligent algorithm
  */
 
 import { PreAnalysisData } from '../pre-analysis-data';
 import bedrockService from '../bedrock.service';
 import { AIPlan } from '../../types/ai-plan.types';
-
-export interface DailyBudget {
-    day: number;
-    budget: number;
-}
+import { trimToFitBudget, validateTrimmedBudget, getTrimmingSummary, type DeviceHours } from '../../utils/budget-trimmer';
 
 export class CostSaverPlan {
 
     /**
-     * Calculate daily budgets for 30 days
-     * Cost Saver uses: Preferred Budget ÷ 30
+     * Generate Cost Saver plan
      */
-    monthCostBreakdown(data: PreAnalysisData): DailyBudget[] {
+    async generate(data: PreAnalysisData): Promise<AIPlan> {
+        console.log('\n🔵 === COST SAVER PLAN (Hybrid: AI Hours + Trim) ===');
+
         const dailyBudget = data.budget.preferredBudget / 30;
+        const targetBudget = dailyBudget * 0.95; // Aim for 95% of budget
 
         console.log(`💰 Cost Saver: Daily budget = ${data.budget.currencySymbol}${dailyBudget.toFixed(2)}`);
+        console.log(`🎯 Cost Saver: Target = ${data.budget.currencySymbol}${targetBudget.toFixed(2)}`);
 
-        return Array(30).fill(null).map((_, i) => ({
-            day: i + 1,
-            budget: dailyBudget
-        }));
-    }
+        // Step 1: Get AI-suggested hours for all devices (30 days)
+        const aiHours = await this.getAISuggestedHours(data);
 
-    /**
-     * Build AI prompt for cost optimization
-     */
-    prompter(data: PreAnalysisData, dailyBudgets: DailyBudget[]): string {
-        const dailyBudget = dailyBudgets[0].budget;
-        const targetBudget = dailyBudget * 0.95; // -5% of budget
-        const { currencySymbol, pricePerKwh } = data.budget;
+        // Step 2: Trim each day to fit budget
+        const dailySchedules = this.trimAndCalculate(aiHours, data, targetBudget);
 
-        // Device list with essential info
-        const deviceList = data.devices.map((d, i) =>
-            `${i + 1}. ID: "${d.id}"
-   Type: ${d.type}
-   Wattage: ${d.wattage}W
-   Priority: ${d.priority} (1=low, 5=critical)
-   User's normal usage: ${d.hoursPerDay}h/day`
-        ).join('\n\n');
+        // Step 3: Generate smart tips
+        const smartAlerts = this.generateSmartTips(data.devices);
 
-        // Weather for each day
-        const weatherByDay = data.weather.map((w, i) =>
-            `Day ${i + 1}: ${w.condition}, ${w.avgTemp}°C, Humidity: ${w.humidity}%`
-        ).join('\n');
+        // Step 4: Calculate metrics
+        const avgDailyCost = dailySchedules.reduce((sum, day) => sum + day.totalCost, 0) / 30;
+        const monthlySaving = data.budget.averageMonthlyCost - (avgDailyCost * 30);
 
-        return `You are an AI energy optimizer generating a COST SAVER plan for 30 days.
-
-BUDGET CONSTRAINT:
-- Daily budget: ${currencySymbol}${dailyBudget.toFixed(2)}
-- TARGET: Aim for ${currencySymbol}${targetBudget.toFixed(2)} per day (at least -5% under budget)
-- Price per kWh: ${currencySymbol}${pricePerKwh}
-
-DEVICES (${data.devices.length} total):
-${deviceList}
-
-WEATHER (30 days):
-${weatherByDay}
-
-===================================
-CALCULATION FORMULA FOR ALLOCATION:
-===================================
-
-**Device Daily Cost Formula:**
-Daily Cost = (Device Wattage ÷ 1000) × Hours × ${currencySymbol}${pricePerKwh}/kWh
-
-**Example Calculation:**
-- Device: AC (1500W)
-- Hours: 4h
-- Cost = (1500 ÷ 1000) × 4 × ${pricePerKwh} = ${(1.5 * 4 * data.budget.pricePerKwh).toFixed(2)} ${currencySymbol}
-
-**Budget Allocation Strategy:**
-1. Calculate each device's cost at different hour levels (1h, 2h, 3h, etc.)
-2. Start with low hours for all devices
-3. Incrementally add hours to devices based on priority
-4. Stop when daily total reaches target budget (${currencySymbol}${targetBudget.toFixed(2)})
-
-===================================
-STEP-BY-STEP ANALYSIS PROCESS:
-===================================
-
-STEP 1: DEVICE TYPE CLASSIFICATION
-Analyze each device by TYPE only (ignore name, power, priority for now):
-- Weather-dependent: AC, Heater, Fan
-- Always-needed: Refrigerator, Freezer, Lights, Laptop, Phone, TV, etc.
-
-STEP 2: INITIAL ALLOCATION
-Allocate ALL devices to EACH day initially.
-
-STEP 3: WEATHER CHECK (Day-by-Day)
-For EACH day, check the weather:
-- Temperature
-- Condition (rain, clear, cloudy, etc.)
-
-STEP 4: WEATHER-BASED FILTERING
-For EACH day, filter devices based on weather REGARDLESS of priority:
-Example:
-- If temp ≥ 30°C: Keep AC, remove Heater
-- If temp ≤ 18°C: Keep Heater, remove AC  
-- If 18°C < temp < 30°C: Remove both AC and Heater, keep Fan
-- Weather-independent devices (Laptop, TV, Fridge, etc.): Keep on ALL days
-
-⚠️ CRITICAL: Each day will have DIFFERENT weather, so device lists and hours MUST VARY per day!
-DO NOT copy day1 to all other days. Weather changes = different devices and hours.
-
-STEP 5: BUDGET COST MANAGEMENT (Per Day)
-For each day after filtering:
-
-a) Calculate cost for each device at different hour levels
-b) Allocate hours based on priority:
-   - Higher priority: More hours (but CAN be reduced if needed)
-   - Medium priority: Moderate hours
-   - Lower priority: Minimal hours
-c) Adjust hours to stay UNDER target budget (${currencySymbol}${targetBudget.toFixed(2)})
-   - Reduce usage hours (can be LOWER than user's normal usage)
-   - Higher priority gets MORE hours than lower priority
-   - But NO device runs 24/7
-d) Final day cost MUST be ≤ ${currencySymbol}${targetBudget.toFixed(2)}
-
-STEP 6: SMART TIPS GENERATION
-Generate ONE smart tip for EACH unique device in the device list.
-Tips should be actionable energy-saving advice specific to that device type.
-Maximum 15 words per tip.
-
-===================================
-OUTPUT FORMAT (JSON):
-===================================
-
-{
-  "plan": {
-    "day1": {
-      "devices": {
-        "device_id_1": {
-          "hours": 3.0,
-          "cost": 25.50
-        },
-        "device_id_2": {
-          "hours": 1.5,
-          "cost": 12.00
-        }
-      },
-      "totalCost": 78.50
-    },
-    "day2": {...},
-    ...
-    "day30": {...}
-  },
-  "deviceTips": {
-    "device_id_1": "Use AC only during peak heat hours to maximize cooling efficiency.",
-    "device_id_2": "Clean refrigerator coils monthly to maintain optimal energy efficiency."
-  }
-}
-
-===================================
-CRITICAL RULES:
-===================================
-
-1. Device IDs must be EXACT (use quotes, no spaces)
-2. Every day's totalCost MUST be ≤ ${currencySymbol}${targetBudget.toFixed(2)}
-3. NO device runs 24 hours
-4. Filter devices by TYPE vs weather (AC on hot days only, Heater on cold days only)
-5. Priority affects hours allocated (higher = more hours)
-6. Usage hours CAN be lower than user's normal usage
-7. Generate exactly ONE tip per unique device
-8. Tips must be ≤ 15 words
-9. Return ONLY valid JSON
-
-Return ONLY the JSON object. NO explanations or markdown.`;
-    }
-
-    /**
-     * Call Bedrock AI and retrieve response
-     */
-    async resultRetriever(prompt: string): Promise<any> {
-        console.log('🤖 Cost Saver: Calling AI...');
-
-        const systemPrompt = `You are an expert energy cost optimizer. 
-Follow the 7-step process exactly as described.
-Filter devices by weather conditions.
-Stay under the target budget for every single day.
-Return ONLY valid JSON matching the specified structure.`;
-
-        const response = await bedrockService.getJSONResponse(prompt, systemPrompt);
-
-        console.log('✅ Cost Saver: AI response received');
-        return response;
-    }
-
-    /**
-     * Format AI response for frontend
-     */
-    resultRenderer(aiResponse: any, data: PreAnalysisData): AIPlan {
-        console.log('🎨 Cost Saver: Rendering result...');
-
-        const dailySchedules: any[] = [];
-        const dailyTips: any[] = [];
-        let totalOptimizedCost = 0;
-
-        // Parse daily schedules
-        for (let day = 1; day <= 30; day++) {
-            const dayData = aiResponse.plan[`day${day}`];
-            if (!dayData) continue;
-
-            const weather = data.weather[day - 1];
-            const schedule: any = {};
-
-            // Add device allocations
-            for (const [deviceId, allocation] of Object.entries(dayData.devices || {})) {
-                const cleanId = deviceId.trim();
-                schedule[cleanId] = {
-                    usage: Math.round(((allocation as any).hours || 0) * 100) / 100,
-                    cost: Math.round(((allocation as any).cost || 0) * 100) / 100
-                };
-            }
-
-            // Add metadata
-            schedule.dayNumber = day;
-            schedule.date = new Date(Date.now() + (day - 1) * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-            schedule.weather = weather;
-            schedule.totalUsageHours = Math.round(Object.values(dayData.devices || {}).reduce((sum: number, d: any) => sum + (d.hours || 0), 0) * 100) / 100;
-            schedule.estimatedCost = Math.round((dayData.totalCost || 0) * 100) / 100;
-
-            dailySchedules.push(schedule);
-            totalOptimizedCost += schedule.estimatedCost;
-        }
-
-        // Parse device tips
-        const deviceTips = aiResponse.deviceTips || {};
-        for (const [deviceId, tip] of Object.entries(deviceTips)) {
-            dailyTips.push({
-                deviceId: deviceId.trim(),
-                tip: (tip as string).substring(0, 100) // Limit to 100 chars
-            });
-        }
-
-        const avgDailyCost = totalOptimizedCost / 30;
-
-        console.log(`✅ Cost Saver: Avg daily cost = ${data.budget.currencySymbol}${avgDailyCost.toFixed(2)}`);
-        console.log(`✅ Cost Saver: Generated ${dailyTips.length} smart tips`);
+        console.log(`✅ Cost Saver complete: Avg ₦${avgDailyCost.toFixed(2)}/day, Monthly saving: ₦${monthlySaving.toFixed(2)}`);
 
         return {
-            id: `cost-saver-${Date.now()}`,
-            type: 'cost',
+            id: 'cost-saver',
             name: 'Cost Saver',
-            description: 'Minimize energy costs while maintaining essential services',
-            dailySchedules,
+            type: 'cost',
+            description: 'Optimized plan staying under your preferred budget',
             devices: data.devices.map(d => d.id),
+            dailySchedules,
+            smartAlerts,
+            dailyTips: [],
             metrics: {
-                initialBudget: Math.round(data.budget.preferredBudget * 100) / 100,
-                optimizedBudget: Math.round(totalOptimizedCost * 100) / 100,
-                monthlySaving: Math.round((data.budget.preferredBudget - totalOptimizedCost) * 100) / 100
-            },
-            dailyTips,
-            smartAlerts: []
+                initialBudget: data.budget.preferredBudget,
+                optimizedBudget: avgDailyCost * 30,
+                monthlySaving
+            }
         };
     }
 
     /**
-     * Main entry point - Generate complete plan
+     * Get AI-suggested hours for all devices (all 30 days)
      */
-    async generate(data: PreAnalysisData): Promise<AIPlan> {
-        console.log('\n🔵 === COST SAVER PLAN ===');
+    private async getAISuggestedHours(data: PreAnalysisData): Promise<{ [day: string]: { [deviceId: string]: number } }> {
+        const prompt = this.buildPrompt(data);
 
-        const budgets = this.monthCostBreakdown(data);
-        const prompt = this.prompter(data, budgets);
-        const aiResponse = await this.resultRetriever(prompt);
-        const plan = this.resultRenderer(aiResponse, data);
+        console.log('🤖 Calling AI for usage hours...');
 
-        console.log('✅ Cost Saver Plan complete\n');
-        return plan;
+        const systemPrompt = `You are a cost optimization expert. Suggest usage hours for each device per day based on weather and priority. Return ONLY valid JSON.`;
+
+        const response = await bedrockService.getJSONResponse(prompt, systemPrompt);
+
+        console.log('✅ AI hours received');
+
+        return response.hours || {};
+    }
+
+    /**
+     * Build AI prompt for device hours
+     */
+    private buildPrompt(data: PreAnalysisData): string {
+        const deviceList = data.devices.map((d, i) =>
+            `${i + 1}. "${d.id}" - ${d.type}, ${d.wattage}W, Priority ${d.priority}, Normal usage: ${d.hoursPerDay}h/day`
+        ).join('\n');
+
+        const weatherByDay = data.weather.map((w, i) =>
+            `Day ${i + 1}: ${w.condition}, ${w.avgTemp}°C`
+        ).join('\n');
+
+        return `Suggest usage hours for devices in a COST SAVER plan (30 days).
+
+DEVICES:
+${deviceList}
+
+WEATHER:
+${weatherByDay}
+
+YOUR TASK: For each day, suggest usage hours for ALL devices.
+
+GUIDELINES:
+1. Weather-dependent devices:
+   - AC: More hours when temp ≥ 28°C, 0 hours when < 28°C
+   - Heater: More hours when temp ≤ 18°C, 0 hours when > 18°C
+   - Fan: Use when 18°C < temp < 28°C
+
+2. Always-needed devices (suggest every day):
+   - Freezer/Refrigerator: 8-12 hours minimum
+   - High priority (priority 5): Close to normal usage
+   - Medium priority (priority 3-4): 50-80% of normal usage
+   - Low priority (priority 1-2): 20-50% of normal usage
+
+3. Vary hours across days:
+   - Don't suggest same hours every day
+   - Weekends: Can increase entertainment devices
+   - Hot days: More cooling devices
+   - Cold days: More heating devices
+
+OUTPUT FORMAT (JSON):
+{
+  "hours": {
+    "day1": {
+      "freezer": 8,
+      "laptop": 6,
+      "fan": 3,
+      "tv": 2,
+      "ac": 0
+    },
+    "day2": {
+      "freezer": 10,
+      "laptop": 5,
+      "fan": 4,
+      "tv": 1,
+      "ac": 0
+    },
+    ...
+    "day30": { ... }
+  }
+}
+
+Include ALL ${data.devices.length} devices for all 30 days. Suggest realistic hours.`;
+    }
+
+    /**
+     * Trim AI hours to fit budget
+     */
+    private trimAndCalculate(
+        aiHours: { [day: string]: { [deviceId: string]: number } },
+        data: PreAnalysisData,
+        dailyBudget: number
+    ): any[] {
+        const schedules = [];
+
+        for (let dayNum = 1; dayNum <= 30; dayNum++) {
+            const dayKey = `day${dayNum}`;
+            const dayHours = aiHours[dayKey] || {};
+
+            // Convert to DeviceHours format
+            const deviceHours: DeviceHours[] = data.devices.map(d => ({
+                id: d.id,
+                hours: dayHours[d.id] || 0,
+                wattage: d.wattage,
+                priority: d.priority,
+                type: d.type
+            }));
+
+            // Trim to fit budget
+            const trimmed = trimToFitBudget(deviceHours, dailyBudget, data.budget.pricePerKwh);
+
+            // Build schedule
+            const allDevicesSchedule: any = {};
+            data.devices.forEach(device => {
+                allDevicesSchedule[device.id] = {
+                    usage: trimmed[device.id]?.hours || 0,
+                    cost: trimmed[device.id]?.cost || 0
+                };
+            });
+
+            const validation = validateTrimmedBudget(trimmed, dailyBudget);
+
+            schedules.push({
+                dayNumber: dayNum,
+                date: new Date(Date.now() + (dayNum - 1) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                day: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'][(dayNum - 1) % 7],
+                weather: {
+                    condition: data.weather[dayNum - 1]?.condition || 'Clear',
+                    temperature: data.weather[dayNum - 1]?.avgTemp || 25,
+                    humidity: data.weather[dayNum - 1]?.humidity || 50,
+                    weatherCode: data.weather[dayNum - 1]?.weatherCode || 0
+                },
+                ...allDevicesSchedule,
+                totalCost: validation.totalCost
+            });
+
+            if (dayNum <= 3) {
+                console.log(`Day ${dayNum}: ${getTrimmingSummary(trimmed)}`);
+            }
+        }
+
+        return schedules;
+    }
+
+    /**
+     * Generate smart tips
+     */
+    private generateSmartTips(devices: any[]): any[] {
+        const tips = devices.map(device => ({
+            message: `Reduce ${device.name} usage during peak hours to save costs`,
+            deviceId: device.id
+        }));
+
+        return tips.slice(0, Math.min(tips.length, 4));
     }
 }

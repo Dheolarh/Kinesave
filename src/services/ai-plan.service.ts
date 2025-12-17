@@ -67,15 +67,27 @@ class AIPlanService {
             const ecoModeGenerator = new EcoModePlan();
             const comfortBalanceGenerator = new ComfortBalancePlan();
 
-            console.log('⏳ Generating 3 plans...');
+            console.log('Starting AI plan generation...');
 
-            const [costSaver, ecoMode, comfortBalance] = await Promise.all([
-                costSaverGenerator.generate(preData),
-                ecoModeGenerator.generate(preData),
-                comfortBalanceGenerator.generate(preData)
-            ]);
+            // Generate plans SEQUENTIALLY to avoid rate limits
+            const startTime = Date.now();
 
-            console.log('✅ All 3 plans generated successfully');
+            // Helper to add delay between requests
+            const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+            console.log('Generating Cost Saver plan...');
+            const costSaver = await costSaverGenerator.generate(preData);
+
+            await delay(5000); // 5 second delay (increased for Claude 3)
+            console.log('Generating Eco Mode plan...');
+            const ecoMode = await ecoModeGenerator.generate(preData);
+
+            // No delay needed for Comfort Balance - it's pure calculation, no AI
+            console.log('Generating Comfort Balance plan (calculated)...');
+            const comfortBalance = await comfortBalanceGenerator.generate(preData, costSaver, ecoMode);
+
+            const endTime = Date.now();
+            console.log(`All plans generated successfully in ${((endTime - startTime) / 1000).toFixed(1)}s`);
 
             // Step 3: Save to storage
             const { updateUserPlans } = await import('../utils/user-storage');

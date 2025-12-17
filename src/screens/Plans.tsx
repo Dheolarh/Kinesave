@@ -141,11 +141,11 @@ export default function Plans() {
                     <div>
                       <p className="text-xs text-black/50 mb-1">Eco Gain</p>
                       <p className="text-lg tracking-tight text-green-600">
-                        +{Math.trunc(plan.metrics.ecoImprovementPercentage || 0)}%
+                        {Math.trunc(plan.metrics.ecoImprovementPercentage || 0)}%
                       </p>
                     </div>
                     <div>
-                      <p className="text-xs text-black/50 mb-1">Monthly Cost Cap</p>
+                      <p className="text-xs text-black/50 mb-1">Monthly Cost</p>
                       <p className="text-lg tracking-tight">
                         {currencySymbol}{Math.trunc(plan.metrics.monthlyCostCap || 0)}
                       </p>
@@ -157,15 +157,15 @@ export default function Plans() {
                 {plan.type === 'balance' && (
                   <>
                     <div>
-                      <p className="text-xs text-black/50 mb-1">Budget Reduction</p>
-                      <p className="text-lg tracking-tight">
-                        -{Math.trunc(plan.metrics.budgetReductionPercentage || 0)}%
+                      <p className="text-xs text-black/50 mb-1">Eco Gain</p>
+                      <p className="text-lg tracking-tight text-green-600">
+                        {Math.trunc(plan.metrics.ecoFriendlyGainPercentage || 0)}%
                       </p>
                     </div>
                     <div>
-                      <p className="text-xs text-black/50 mb-1">Eco Gain</p>
-                      <p className="text-lg tracking-tight text-green-600">
-                        +{Math.trunc(plan.metrics.ecoFriendlyGainPercentage || 0)}%
+                      <p className="text-xs text-black/50 mb-1">Optimized Budget</p>
+                      <p className="text-lg tracking-tight">
+                        {currencySymbol}{Math.trunc(plan.metrics.optimizedBudget || 0)}
                       </p>
                     </div>
                   </>

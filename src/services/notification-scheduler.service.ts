@@ -1,4 +1,5 @@
 import notificationService from './notification.service';
+import { getUserData, getUserPlans } from '../utils/user-storage';
 
 /**
  * Notification Scheduler Service
@@ -94,21 +95,16 @@ class NotificationScheduler {
      */
     private async sendSmartTipNotification(currentDate: string): Promise<void> {
         try {
-            const activePlan = localStorage.getItem('activePlan');
-            if (!activePlan) return;
+            const plansData = getUserPlans();
+            if (!plansData?.activePlan) return;
 
-            const plan = JSON.parse(activePlan);
-            const aiPlansData = localStorage.getItem('aiGeneratedPlans');
-            if (!aiPlansData) return;
-
-            const aiPlans = JSON.parse(aiPlansData);
+            const activePlanType = plansData.activePlan;
 
             // Get the current plan data
-            const planKey = plan.id === '1' || plan.type === 'cost' ? 'costSaver' :
-                plan.id === '2' || plan.type === 'eco' ? 'ecoMode' :
-                    'comfortBalance';
+            const planKey = activePlanType === 'cost' ? 'costSaver' :
+                activePlanType === 'eco' ? 'ecoMode' : 'comfortBalance';
 
-            const currentPlanData = aiPlans[planKey];
+            const currentPlanData = plansData[planKey];
             if (!currentPlanData || !currentPlanData.smartAlerts || currentPlanData.smartAlerts.length === 0) {
                 return;
             }
@@ -116,7 +112,10 @@ class NotificationScheduler {
             // Pick a random smart tip
             const randomIndex = Math.floor(Math.random() * currentPlanData.smartAlerts.length);
             const tip = currentPlanData.smartAlerts[randomIndex];
-            const tipText = typeof tip === 'string' ? tip : tip.alert || tip.tip || tip.message;
+            const tipText = typeof tip === 'string' ? tip : (tip as any).message || '';
+
+            // Map plan type to ID
+            const planId = activePlanType === 'cost' ? '1' : activePlanType === 'eco' ? '2' : '3';
 
             // Send notification
             await notificationService.send({
@@ -126,10 +125,10 @@ class NotificationScheduler {
                 message: tipText,
                 timestamp: new Date().toISOString(),
                 read: false,
-                actionUrl: `/plan/${plan.id}`,
+                actionUrl: `/plan/${planId}`,
                 data: {
-                    planId: plan.id,
-                    planType: plan.type || planKey.replace('Saver', '').toLowerCase(),
+                    planId: planId,
+                    planType: activePlanType,
                     tipIndex: randomIndex,
                 },
             });
@@ -165,30 +164,20 @@ class NotificationScheduler {
      */
     private async sendDailyReminder(): Promise<void> {
         try {
-            const activePlan = localStorage.getItem('activePlan');
-            if (!activePlan) {
+            const plansData = getUserPlans();
+            if (!plansData?.activePlan) {
                 console.log('No active plan, skipping daily reminder');
                 return;
             }
 
-            const plan = JSON.parse(activePlan);
+            const activePlanType = plansData.activePlan;
             const today = new Date().toISOString().split('T')[0];
 
-            // Get today's schedule from AI plans
-            const aiPlansData = localStorage.getItem('aiGeneratedPlans');
-            if (!aiPlansData) {
-                console.log('No AI plans found, skipping daily reminder');
-                return;
-            }
-
-            const aiPlans = JSON.parse(aiPlansData);
-
             // Get the current plan data
-            const planKey = plan.id === '1' || plan.type === 'cost' ? 'costSaver' :
-                plan.id === '2' || plan.type === 'eco' ? 'ecoMode' :
-                    'comfortBalance';
+            const planKey = activePlanType === 'cost' ? 'costSaver' :
+                activePlanType === 'eco' ? 'ecoMode' : 'comfortBalance';
 
-            const currentPlanData = aiPlans[planKey];
+            const currentPlanData = plansData[planKey];
             if (!currentPlanData) return;
 
             // Find today's schedule
@@ -204,37 +193,39 @@ class NotificationScheduler {
                 const deviceCount = deviceKeys.length;
 
                 // Calculate estimated cost
-                const energyData = localStorage.getItem('energyData');
-                const pricePerKwh = energyData ? JSON.parse(energyData).pricePerKwh : 36;
-                const currencySymbol = energyData ? JSON.parse(energyData).currencySymbol : '$';
+                const userData = getUserData();
+                const pricePerKwh = userData?.energyCosts?.pricePerKwh || 36;
+                const currencySymbol = userData?.energyCosts?.currencySymbol || '$';
 
                 let totalCost = 0;
                 deviceKeys.forEach(deviceId => {
-                    const usage = todaySchedule[deviceId];
+                    const usage = (todaySchedule as any)[deviceId];
                     if (usage && typeof usage === 'object' && usage.usage) {
                         // Rough estimate: assume average device is 150W
                         const kwhUsed = (150 * usage.usage) / 1000;
-                        totalCost += kwhUsed * parseFloat(pricePerKwh);
+                        totalCost += kwhUsed * parseFloat(pricePerKwh.toString());
                     }
                 });
 
                 const cost = totalCost.toFixed(2);
                 const weather = todaySchedule.weather?.condition || 'Clear';
-                const temp = todaySchedule.weather?.avgTemp || todaySchedule.weather?.temperature || 0;
+                const temp = todaySchedule.weather?.temperature || 0;
+                const planId = activePlanType === 'cost' ? '1' : activePlanType === 'eco' ? '2' : '3';
+                const planName = currentPlanData.name || 'energy plan';
 
                 await notificationService.send({
                     id: `daily_${Date.now()}`,
                     type: 'daily_reminder',
                     title: 'Good Morning! Time to Check Your Plan',
-                    message: `Today's ${plan.name || 'energy plan'}: ${deviceCount} devices, ${weather} ${temp}°C. Est. cost: ${currencySymbol}${cost}`,
+                    message: `Today's ${planName}: ${deviceCount} devices, ${weather} ${temp}°C. Est. cost: ${currencySymbol}${Math.trunc(parseFloat(cost))}`,
                     timestamp: new Date().toISOString(),
                     read: false,
-                    actionUrl: `/plan/${plan.id}`,
+                    actionUrl: `/plan/${planId}`,
                     data: {
-                        planId: plan.id,
-                        planType: plan.type || planKey.replace('Saver', '').toLowerCase(),
+                        planId: planId,
+                        planType: activePlanType,
                         scheduledDevices: deviceCount,
-                        estimatedCost: parseFloat(cost),
+                        estimatedCost: Math.trunc(parseFloat(cost)),
                         weatherCondition: `${weather} ${temp}°C`,
                     },
                 });

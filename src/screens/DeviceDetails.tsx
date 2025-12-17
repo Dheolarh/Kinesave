@@ -3,7 +3,7 @@ import { ArrowLeft, Edit2, X } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { useState, useEffect } from "react";
 import BottomNav from "../components/BottomNav";
-import { getUserData, updateUserDevices } from "../utils/user-storage";
+import { getUserData, getUserPlans, updateUserDevices } from "../utils/user-storage";
 import { getDeviceIcon } from "../utils/device-types";
 
 
@@ -37,22 +37,19 @@ export default function DeviceDetails() {
   // Helper function to check if device is in active plan
   const isDeviceInActivePlan = (deviceId: string): boolean => {
     try {
-      const savedPlan = localStorage.getItem("activePlan");
-      if (!savedPlan) return false;
+      const plansData = getUserPlans();
+      if (!plansData?.activePlan) return false;
 
-      const plan = JSON.parse(savedPlan);
-
-      // Get the full plan details from aiGeneratedPlans
-      const savedPlans = localStorage.getItem('aiGeneratedPlans');
-      if (!savedPlans) return false;
-
-      const plansData = JSON.parse(savedPlans);
       let fullPlan = null;
 
-      // Map plan ID to full plan data
-      if (plan.id === '1') fullPlan = plansData.costSaver;
-      else if (plan.id === '2') fullPlan = plansData.ecoMode;
-      else if (plan.id === '3') fullPlan = plansData.comfortBalance;
+      // Map activePlan type to plan data
+      if (plansData.activePlan === 'cost') {
+        fullPlan = plansData.costSaver;
+      } else if (plansData.activePlan === 'eco') {
+        fullPlan = plansData.ecoMode;
+      } else if (plansData.activePlan === 'balance') {
+        fullPlan = plansData.comfortBalance;
+      }
 
       if (!fullPlan || !fullPlan.devices) return false;
 
