@@ -12,6 +12,37 @@ export const median = {
     },
 
     /**
+     * Request location permission (Android)
+     * For Android, must be called before using geolocation
+     */
+    requestLocationPermission(): Promise<boolean> {
+        return new Promise((resolve) => {
+            if (this.isApp() && (window as any).median?.permissions) {
+                (window as any).median.permissions.request(
+                    'location',
+                    (granted: boolean) => {
+                        resolve(granted);
+                    }
+                );
+            } else {
+                // Not in median app or no permissions API, assume granted
+                resolve(true);
+            }
+        });
+    },
+
+    /**
+     * Check if location services are ready (iOS)
+     * This prevents double prompting on iOS
+     */
+    isGeolocationReady(): boolean {
+        if (this.isApp() && (window as any).median_geolocation_ready) {
+            return (window as any).median_geolocation_ready();
+        }
+        return true; // Assume ready if not in median app
+    },
+
+    /**
      * Register user for push notifications via OneSignal
      */
     registerForPush(userId: string, tags?: Record<string, any>): void {

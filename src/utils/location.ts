@@ -35,12 +35,30 @@ export function isMedianApp(): boolean {
 
 /**
  * Get current position using Median.co native API (mobile) or browser API (web)
+ * Handles permission requests for Android and iOS ready state
  */
-export function getCurrentPosition(): Promise<GeolocationPosition> {
+export async function getCurrentPosition(): Promise<GeolocationPosition> {
+    // If in median app, handle permissions
+    if (isMedianApp()) {
+        // Import median bridge
+        const median = (await import('./median-bridge')).default;
+
+        // For Android: Request permission first
+        const hasPermission = await median.requestLocationPermission();
+        if (!hasPermission) {
+            throw new Error('Location permission denied');
+        }
+
+        // For iOS: Check if geolocation is ready
+        if (!median.isGeolocationReady()) {
+            throw new Error('Geolocation not ready. Please try again in a moment.');
+        }
+    }
+
     return new Promise((resolve, reject) => {
         const options: PositionOptions = {
-            enableHighAccuracy: false, // Changed to false for faster response
-            timeout: 30000, // Increased from 10000ms to 30000ms (30 seconds)
+            enableHighAccuracy: false,
+            timeout: 30000,
             maximumAge: 0,
         };
 
