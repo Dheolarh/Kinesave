@@ -1,16 +1,13 @@
 import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router";
 import { motion, AnimatePresence } from "motion/react";
-import { MapPin, AlertCircle, Search, X } from "lucide-react";
-import { detectLocation, searchLocation, getWeatherData, getLocationFromStorage, type LocationData, type LocationSearchResult } from "../utils/location";
+import { MapPin, Search } from "lucide-react";
+import { searchLocation, getWeatherData, getLocationFromStorage, type LocationData, type LocationSearchResult } from "../utils/location";
 import { updateUserLocation } from "../utils/user-storage";
 
 export default function LocationDetection() {
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [locationData, setLocationData] = useState<LocationData | null>(null);
-  const [showManualEntry, setShowManualEntry] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<LocationSearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -21,12 +18,7 @@ export default function LocationDetection() {
     const savedLocation = getLocationFromStorage();
     if (savedLocation) {
       setLocationData(savedLocation);
-      setLoading(false);
-      return;
     }
-
-    // Auto-detect location
-    detectLocationAsync();
   }, []);
 
   // Debounced search
@@ -54,41 +46,8 @@ export default function LocationDetection() {
     };
   }, [searchQuery]);
 
-  const detectLocationAsync = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const data = await detectLocation();
-      setLocationData(data);
-      setLoading(false);
-    } catch (err) {
-      setLoading(false);
-      if (err instanceof GeolocationPositionError) {
-        switch (err.code) {
-          case err.PERMISSION_DENIED:
-            setError("Location access denied. Please enable location permissions or enter manually.");
-            break;
-          case err.POSITION_UNAVAILABLE:
-            setError("Location information unavailable.");
-            break;
-          case err.TIMEOUT:
-            setError("Location request timed out.");
-            break;
-          default:
-            setError("Failed to detect location.");
-        }
-      } else {
-        setError("Failed to detect location. Please try again.");
-      }
-      console.error("Location detection error:", err);
-    }
-  };
-
   const handleLocationSelect = async (result: LocationSearchResult) => {
     try {
-      setLoading(true);
-      setError(null); // Clear any previous errors
-      setShowManualEntry(false);
       setSearchQuery("");
       setSearchResults([]);
 
@@ -105,11 +64,9 @@ export default function LocationDetection() {
       };
 
       setLocationData(fullLocationData);
-      setLoading(false);
     } catch (err) {
-      setLoading(false);
-      setError("Failed to fetch weather data for selected location.");
       console.error("Weather fetch error:", err);
+      alert("Failed to fetch weather data. Please try another location.");
     }
   };
 
@@ -144,107 +101,53 @@ export default function LocationDetection() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6 }}
       >
-        {!showManualEntry ? (
+        {locationData ? (
+          // Show detected location with Continue button
           <>
             <div className="mb-8">
               <motion.div
                 className="w-16 h-16 mx-auto mb-6 bg-white/40 backdrop-blur-xl border border-white/60 rounded-full flex items-center justify-center shadow-lg"
-                animate={{
-                  rotate: loading ? 360 : 0,
-                  scale: error ? [1, 1.1, 1] : 1
-                }}
-                transition={{
-                  rotate: { duration: 2, repeat: loading ? Infinity : 0, ease: "linear" },
-                  scale: { duration: 0.3 }
-                }}
               >
-                {error ? (
-                  <AlertCircle className="w-7 h-7 text-red-500" strokeWidth={1.5} />
-                ) : (
-                  <MapPin className="w-7 h-7" strokeWidth={1.5} />
-                )}
+                <MapPin className="w-7 h-7" strokeWidth={1.5} />
               </motion.div>
             </div>
 
-            <h2 className="text-2xl mb-3 tracking-tight">
-              {loading
-                ? "Detecting Your Location..."
-                : error
-                  ? "Location Detection Failed"
-                  : "Location Detected"}
-            </h2>
+            <h2 className="text-2xl mb-3 tracking-tight">Location Set</h2>
 
             <p className="text-sm text-black/60 leading-relaxed mb-4">
-              {error
-                ? error
-                : "Provide your location for accurate analysis"}
+              Your location has been saved
             </p>
 
-            {locationData && !error && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4 }}
-                className="mt-8"
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4 }}
+              className="mt-8"
+            >
+              <p className="text-sm mb-2 text-black/70 font-medium">
+                {locationData.city}
+                {locationData.region && `, ${locationData.region} `}
+                {locationData.country && `, ${locationData.country} `}
+              </p>
+              <p className="text-xs mb-6 text-black/50">
+                {locationData.temperature}°C • {locationData.humidity}% humidity
+                {locationData.weatherDescription && ` • ${locationData.weatherDescription} `}
+              </p>
+              <button
+                onClick={handleContinue}
+                className="px-8 py-3 bg-black text-white rounded-full text-sm tracking-wide hover:bg-black/90 transition-colors"
               >
-                <p className="text-sm mb-2 text-black/70 font-medium">
-                  {locationData.city}
-                  {locationData.region && `, ${locationData.region} `}
-                  {locationData.country && `, ${locationData.country} `}
-                </p>
-                <p className="text-xs mb-6 text-black/50">
-                  {locationData.temperature}°C • {locationData.humidity}% humidity
-                  {locationData.weatherDescription && ` • ${locationData.weatherDescription} `}
-                </p>
-                <button
-                  onClick={handleContinue}
-                  className="px-8 py-3 bg-black text-white rounded-full text-sm tracking-wide hover:bg-black/90 transition-colors"
-                >
-                  Continue
-                </button>
-              </motion.div>
-            )}
-
-            {error && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4 }}
-                className="mt-8 space-y-3"
-              >
-                <button
-                  onClick={detectLocationAsync}
-                  className="px-8 py-3 bg-black text-white rounded-full text-sm tracking-wide hover:bg-black/90 transition-colors w-full"
-                >
-                  Try Again
-                </button>
-                <button
-                  onClick={() => setShowManualEntry(true)}
-                  className="px-8 py-3 bg-white/40 backdrop-blur-xl border border-white/60 rounded-full text-sm tracking-wide hover:bg-white/50 transition-colors w-full"
-                >
-                  Enter Location Manually
-                </button>
-              </motion.div>
-            )}
+                Continue
+              </button>
+            </motion.div>
           </>
         ) : (
+          // Show manual entry search by default
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.3 }}
-            className="relative"
           >
-            <button
-              onClick={() => {
-                setShowManualEntry(false);
-                setSearchQuery("");
-                setSearchResults([]);
-              }}
-              className="absolute -top-2 -right-2 w-8 h-8 bg-black/10 hover:bg-black/20 rounded-full flex items-center justify-center transition-colors"
-            >
-              <X className="w-4 h-4" strokeWidth={2} />
-            </button>
-
             <h2 className="text-2xl mb-3 tracking-tight">Enter Your Location</h2>
             <p className="text-sm text-black/60 mb-6">
               Search for your city or area
@@ -257,7 +160,7 @@ export default function LocationDetection() {
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="e.g.,  Maizuru-shi, Kyoto, Japan"
+                  placeholder="e.g., Lagos, Nigeria"
                   className="w-full pl-12 pr-4 py-3 bg-white/40 backdrop-blur-xl border border-white/60 rounded-2xl text-sm placeholder:text-black/40 focus:outline-none focus:ring-2 focus:ring-black/10"
                   autoFocus
                 />
