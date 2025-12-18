@@ -1886,3 +1886,22 @@ html {
     opacity: .5;
   }
 }
+
+/* Prevent pull-to-refresh on scroll containers and modals */
+body {
+  overscroll-behavior-y: contain;
+}
+
+/* Fix for modal scroll - prevent page reload on overscroll */
+.modal-content,
+[role="dialog"],
+.overflow-y-auto,
+.overflow-auto {
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Specific fix for modal overlays */
+.fixed.inset-0 {
+  overscroll-behavior: contain;
+}
