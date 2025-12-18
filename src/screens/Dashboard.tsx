@@ -852,10 +852,10 @@ export default function Dashboard() {
                               const ecoGain = fullPlan.metrics.ecoImprovementPercentage || 0;
                               return <>Eco gain: {ecoGain}%</>;
                             } else if (activePlan.id === '3' && fullPlan?.type === 'balance') {
-                              // Comfort Balance: "Cost saved: {amount} • Eco gain: {percentage}%"
-                              const costSaved = fullPlan.metrics.monthlySaving || 0;
+                              // Comfort Balance: "Optimized budget: {amount} • Eco gain: {percentage}%"
+                              const optimizedBudget = fullPlan.metrics.optimizedBudget || 0;
                               const ecoGain = fullPlan.metrics.ecoFriendlyGainPercentage || 0;
-                              return <>Cost saved: {currencySymbol}{Math.trunc(costSaved)} • Eco gain: {ecoGain}%</>;
+                              return <>Optimized budget: {currencySymbol}{Math.trunc(optimizedBudget)} • Eco gain: {ecoGain}%</>;
                             }
 
                             // Fallback
