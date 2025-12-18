@@ -123,7 +123,8 @@ function enforceDailyDevice(
 
     // Cost Mode OR Eco Mode with low emission
     // Minimum hours = userSetHours × (priority / 5) × 0.6
-    const minHours = device.userSetHours * (device.priority / 5) * 0.6;
+    // Ensure priority is at least 1 to avoid 0 hours
+    const minHours = device.userSetHours * (Math.max(1, device.priority) / 5) * 0.6;
 
     return Math.max(aiSuggestedHours, minHours);
 }
@@ -160,7 +161,8 @@ function enforceWeekendsDevice(
 
     // Cost Mode: Priority-based hours
     // Hours = userSetHours × (priority / 5)
-    return device.userSetHours * (device.priority / 5);
+    // Ensure priority is at least 1 to avoid 0 hours
+    return device.userSetHours * (Math.max(1, device.priority) / 5);
 }
 
 /**
@@ -169,8 +171,8 @@ function enforceWeekendsDevice(
  * - Will be filtered in enforceWeeklyConstraints()
  */
 function enforceRarelyDevice(
-    device: FrequencyRule,
-    dayNum: number,
+    _device: FrequencyRule,
+    _dayNum: number,
     aiSuggestedHours: number
 ): number {
     // Return AI suggestion for now
@@ -184,8 +186,8 @@ function enforceRarelyDevice(
  * - Will be enforced in enforceWeeklyConstraints()
  */
 function enforceFrequentlyDevice(
-    device: FrequencyRule,
-    dayNum: number,
+    _device: FrequencyRule,
+    _dayNum: number,
     aiSuggestedHours: number
 ): number {
     // Return AI suggestion for now

@@ -233,7 +233,7 @@ Rate AND suggest hours for ALL ${data.devices.length} devices across all 30 days
                         frequencyConstraints[d.id] = d.hoursPerDay * 0.3;  // Max 30%
                     } else {
                         // Low emission daily device: normal minimum
-                        frequencyConstraints[d.id] = d.hoursPerDay * (d.priority / 5) * 0.6;
+                        frequencyConstraints[d.id] = d.hoursPerDay * (Math.max(1, d.priority) / 5) * 0.6;
                     }
                 } else if (d.frequency === 'weekends') {
                     if (isWeekend) {

@@ -133,8 +133,8 @@ export default function PlanDetails() {
             };
         } else {
             return {
-                label1: "Actual Cost",
-                value1: `${currencySymbol}${Math.trunc(metrics.actualMonthlyCost || 0)} `,
+                label1: "Eco Gain",
+                value1: `${Math.trunc(metrics.ecoFriendlyGainPercentage || 0)}% `,
                 label2: "Optimized Budget",
                 value2: `${currencySymbol}${Math.trunc(metrics.optimizedBudget || 0)} `
             };

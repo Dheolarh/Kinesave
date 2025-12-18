@@ -196,10 +196,10 @@ Include ALL ${data.devices.length} devices for all 30 days. Suggest realistic ho
             data.devices.forEach(d => {
                 if (d.frequency === 'daily') {
                     // Daily minimum = userSetHours × (priority / 5) × 0.6
-                    frequencyConstraints[d.id] = d.hoursPerDay * (d.priority / 5) * 0.6;
+                    frequencyConstraints[d.id] = d.hoursPerDay * (Math.max(1, d.priority) / 5) * 0.6;
                 } else if (d.frequency === 'weekends') {
                     // Weekends: minimum on Sat/Sun, 0 on weekdays
-                    frequencyConstraints[d.id] = isWeekend ? (d.hoursPerDay * (d.priority / 5) * 0.5) : 0;
+                    frequencyConstraints[d.id] = isWeekend ? (d.hoursPerDay * (Math.max(1, d.priority) / 5) * 0.5) : 0;
                 } else {
                     // Rarely/frequently: no hard minimum (handled by enforcer)
                     frequencyConstraints[d.id] = 0;
