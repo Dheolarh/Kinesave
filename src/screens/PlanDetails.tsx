@@ -515,6 +515,7 @@ export default function PlanDetails() {
                                             const usage = (dailySchedule as any)[deviceId];
                                             if (!usage || typeof usage !== 'object') return null;
 
+
                                             const device = deviceNames[deviceId];
                                             const deviceType = device?.type || '';
 
@@ -531,8 +532,10 @@ export default function PlanDetails() {
                                                 }
                                             }
 
-                                            // Determine priority (1-5 numeric value)
-                                            const priorityNumber = device?.priority || 0;
+                                            // Get priority from actual user device data
+                                            const userData = getUserData();
+                                            const userDevice = userData?.devices?.find((d: any) => d.id === deviceId);
+                                            const priorityNumber = userDevice?.priority || 3;
 
                                             const DeviceIcon = getDeviceIcon(deviceType);
 
