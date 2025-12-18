@@ -87,6 +87,7 @@ export default function LocationDetection() {
   const handleLocationSelect = async (result: LocationSearchResult) => {
     try {
       setLoading(true);
+      setError(null); // Clear any previous errors
       setShowManualEntry(false);
       setSearchQuery("");
       setSearchResults([]);
@@ -104,7 +105,6 @@ export default function LocationDetection() {
       };
 
       setLocationData(fullLocationData);
-      setError(null);
       setLoading(false);
     } catch (err) {
       setLoading(false);
