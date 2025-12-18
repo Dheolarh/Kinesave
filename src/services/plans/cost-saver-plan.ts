@@ -27,13 +27,34 @@ export class CostSaverPlan {
         // Step 1: Get AI-suggested hours for all devices (30 days)
         const aiHours = await this.getAISuggestedHours(data);
 
-        // Step 2: Trim each day to fit budget
-        const dailySchedules = this.trimAndCalculate(aiHours, data, targetBudget);
+        // Step 2: NEW - Enforce frequency rules
+        const { enforceFrequencyRules } = await import('../../utils/frequency-enforcer');
 
-        // Step 3: Generate smart tips
+        const frequencyRules = data.devices.map(d => ({
+            deviceId: d.id,
+            frequency: d.frequency as 'daily' | 'weekends' | 'rarely' | 'frequently',
+            priority: d.priority,
+            userSetHours: d.hoursPerDay,
+            wattage: d.wattage,
+            type: d.type
+        }));
+
+        console.log('Enforcing frequency rules (Cost Mode)...');
+        const enforcedSchedule = enforceFrequencyRules(aiHours, frequencyRules, false);  // false = not eco mode
+
+        // Convert DaySchedule[] back to { [day: string]: { [deviceId: string]: number } }
+        const enforcedHours: { [day: string]: { [deviceId: string]: number } } = {};
+        enforcedSchedule.forEach(daySchedule => {
+            enforcedHours[`day${daySchedule.dayNumber}`] = daySchedule.deviceHours;
+        });
+
+        // Step 3: Trim each day to fit budget (respects frequency minimums)
+        const dailySchedules = this.trimAndCalculate(enforcedHours, data, targetBudget);
+
+        // Step 4: Generate smart tips
         const smartAlerts = this.generateSmartTips(data.devices);
 
-        // Step 4: Calculate metrics
+        // Step 5: Calculate metrics
         const avgDailyCost = dailySchedules.reduce((sum, day) => sum + day.totalCost, 0) / 30;
         const monthlySaving = data.budget.averageMonthlyCost - (avgDailyCost * 30);
 
@@ -158,11 +179,35 @@ Include ALL ${data.devices.length} devices for all 30 days. Suggest realistic ho
                 hours: dayHours[d.id] || 0,
                 wattage: d.wattage,
                 priority: d.priority,
-                type: d.type
+                type: d.type,
+                frequency: d.frequency as 'daily' | 'weekends' | 'rarely' | 'frequently'
             }));
 
-            // Trim to fit budget
-            const trimmed = trimToFitBudget(deviceHours, dailyBudget, data.budget.pricePerKwh);
+            // Calculate frequency constraints (minimum hours per device)
+            const frequencyConstraints: { [deviceId: string]: number } = {};
+
+            // Helper: Check if day is weekend
+            const isWeekendDay = (dayNum: number): boolean => {
+                const dayOfWeek = ((dayNum - 1) % 7) + 1;
+                return dayOfWeek === 6 || dayOfWeek === 7;
+            };
+            const isWeekend = isWeekendDay(dayNum);
+
+            data.devices.forEach(d => {
+                if (d.frequency === 'daily') {
+                    // Daily minimum = userSetHours × (priority / 5) × 0.6
+                    frequencyConstraints[d.id] = d.hoursPerDay * (d.priority / 5) * 0.6;
+                } else if (d.frequency === 'weekends') {
+                    // Weekends: minimum on Sat/Sun, 0 on weekdays
+                    frequencyConstraints[d.id] = isWeekend ? (d.hoursPerDay * (d.priority / 5) * 0.5) : 0;
+                } else {
+                    // Rarely/frequently: no hard minimum (handled by enforcer)
+                    frequencyConstraints[d.id] = 0;
+                }
+            });
+
+            // Trim to fit budget with frequency constraints
+            const trimmed = trimToFitBudget(deviceHours, dailyBudget, data.budget.pricePerKwh, frequencyConstraints);
 
             // Build schedule
             const allDevicesSchedule: any = {};

@@ -531,8 +531,8 @@ export default function PlanDetails() {
                                                 }
                                             }
 
-                                            // Determine priority
-                                            const priority = device?.priority || 'Medium';
+                                            // Determine priority (1-5 numeric value)
+                                            const priorityNumber = device?.priority || 0;
 
                                             const DeviceIcon = getDeviceIcon(deviceType);
 
@@ -548,7 +548,7 @@ export default function PlanDetails() {
                                                         <div className="flex-1">
                                                             <div className="text-sm mb-0.5">{deviceName}</div>
                                                             <div className="text-xs text-black/50">
-                                                                Priority: <span className={priority === 'High' ? 'text-black' : ''}>{priority}</span>
+                                                                Priority Level: <span className={priorityNumber >= 4 ? 'text-black font-medium' : ''}>{priorityNumber}</span>
                                                             </div>
                                                         </div>
                                                     </div>

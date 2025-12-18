@@ -5,6 +5,7 @@ export interface DeviceHours {
     wattage: number;
     priority: number;
     type: string;
+    frequency?: 'daily' | 'weekends' | 'rarely' | 'frequently';  // NEW: For frequency tracking
 }
 
 export interface TrimmedResult {
@@ -12,6 +13,10 @@ export interface TrimmedResult {
         hours: number;
         cost: number;
     };
+}
+
+export interface FrequencyConstraints {
+    [deviceId: string]: number;  // Minimum required hours per device
 }
 
 /**
@@ -24,11 +29,13 @@ function calculateCost(device: DeviceHours, pricePerKwh: number): number {
 
 /**
  * Trim device hours to fit within daily budget
+ * NEW: Respects frequency constraints (minimum required hours)
  */
 export function trimToFitBudget(
     deviceHours: DeviceHours[],
     dailyBudget: number,
-    pricePerKwh: number
+    pricePerKwh: number,
+    frequencyConstraints?: FrequencyConstraints  // NEW: Minimum hours per device
 ): TrimmedResult {
     // Make copies to avoid mutating original
     let devices = deviceHours.map(d => ({ ...d }));
@@ -62,7 +69,16 @@ export function trimToFitBudget(
 
             if (device.hours <= 0) continue;
 
+            // NEW: Check frequency minimum
+            const minimumHours = frequencyConstraints?.[device.id] || 0;
+
+            // Skip if already at minimum
+            if (device.hours <= minimumHours) {
+                continue;
+            }
+
             // Calculate trim amount based on current hours
+            // Trim by HOURS to keep under budget (user requirement)
             // High-usage devices: Remove bigger chunks
             // Low-usage devices: Remove smaller chunks
             let trimAmount: number;
@@ -80,20 +96,18 @@ export function trimToFitBudget(
                 // Very low usage: Remove 0.1 hours
                 trimAmount = 0.1;
             } else {
-                // Minimal usage: Set to 0
-                trimAmount = device.hours;
+                // Minimal usage: Set to minimum
+                trimAmount = device.hours - minimumHours;
             }
 
-            // Protect high-priority devices more
-            if (device.priority >= 5) {
-                trimAmount *= 0.5; // Trim half as much
-            } else if (device.priority === 1) {
-                trimAmount *= 1.5; // Trim more aggressively
-            }
-
-            // Apply trim
+            // NEW: Never trim below minimum hours
             const oldHours = device.hours;
-            device.hours = Math.max(0, device.hours - trimAmount);
+            const newHours = Math.max(minimumHours, device.hours - trimAmount);
+
+            // If no change possible, skip
+            if (newHours === oldHours) continue;
+
+            device.hours = newHours;
 
             // Recalculate total
             totalCost = devices.reduce((sum, d) => sum + calculateCost(d, pricePerKwh), 0);
@@ -110,6 +124,40 @@ export function trimToFitBudget(
         if (!trimmed) {
             // No more trimming possible
             break;
+        }
+    }
+
+    // STRICT BUDGET ENFORCEMENT: If still over budget, trim aggressively (ignore minimums)
+    if (totalCost > dailyBudget) {
+        console.warn(`Still over budget (₦${totalCost.toFixed(2)}). Performing strict enforcement...`);
+
+        let strictIterations = 0;
+        const MAX_STRICT_ITERATIONS = 50;
+
+        while (totalCost > dailyBudget && strictIterations < MAX_STRICT_ITERATIONS) {
+            strictIterations++;
+
+            // Sort by hours (trim highest first)
+            devices.sort((a, b) => b.hours - a.hours);
+
+            let trimmed = false;
+            for (const device of devices) {
+                if (device.hours <= 0) continue;
+
+                // Aggressive trim: 0.1 hour at a time, ignoring minimums
+                const trimAmount = Math.min(0.1, device.hours);
+                device.hours = Math.max(0, device.hours - trimAmount);
+
+                totalCost = devices.reduce((sum, d) => sum + calculateCost(d, pricePerKwh), 0);
+                trimmed = true;
+
+                if (totalCost <= dailyBudget) {
+                    console.log(`Strict enforcement succeeded: ₦${totalCost.toFixed(2)}`);
+                    break;
+                }
+            }
+
+            if (!trimmed) break;
         }
     }
 

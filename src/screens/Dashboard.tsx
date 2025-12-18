@@ -6,7 +6,7 @@ import AddDeviceModal from "../components/AddDeviceModal";
 import { getCurrentUserId, getUserData, getUserPlans, updateUserDevices, updateUserLocation, updateUserPlans } from "../utils/user-storage";
 import { searchLocation, getWeatherData } from "../utils/location";
 import type { LocationSearchResult } from "../utils/location";
-import { Plus, CloudSun, X, MapPin, Bell, TrendingDown } from "lucide-react";
+import { Plus, CloudSun, X, MapPin, Bell, TrendingDown, Leaf, Gauge } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import NotificationCenter from "../components/NotificationCenter";
 import notificationService from "../services/notification.service";
@@ -813,12 +813,54 @@ export default function Dashboard() {
                   <div className="bg-white/50 backdrop-blur-sm border border-white/60 rounded-2xl p-4 shadow-lg">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 bg-white/50 backdrop-blur-sm border border-white/60 rounded-xl flex items-center justify-center">
-                        <TrendingDown className="w-5 h-5" strokeWidth={1.5} />
+                        {activePlan.id === '1' && <TrendingDown className="w-5 h-5" strokeWidth={1.5} />}
+                        {activePlan.id === '2' && <Leaf className="w-5 h-5" strokeWidth={1.5} />}
+                        {activePlan.id === '3' && <Gauge className="w-5 h-5" strokeWidth={1.5} />}
                       </div>
                       <div className="flex-1">
                         <div className="text-sm font-medium mb-0.5">{activePlan.name}</div>
                         <div className="text-xs text-black/50">
-                          Savings: {activePlan.savings}
+                          {(() => {
+                            // Get full plan data to access metrics
+                            const plansData = getUserPlans();
+                            let fullPlan = null;
+                            let currencySymbol = '$';
+
+                            if (plansData) {
+                              try {
+                                if (activePlan.id === '1') fullPlan = plansData.costSaver;
+                                else if (activePlan.id === '2') fullPlan = plansData.ecoMode;
+                                else if (activePlan.id === '3') fullPlan = plansData.comfortBalance;
+
+                                // Get currency symbol
+                                const userData = getUserData();
+                                if (userData?.energyCosts) {
+                                  currencySymbol = userData.energyCosts.currencySymbol || '$';
+                                }
+                              } catch (error) {
+                                console.error('Error loading plan details:', error);
+                              }
+                            }
+
+                            // Plan-specific savings display
+                            if (activePlan.id === '1' && fullPlan?.type === 'cost') {
+                              // Cost Saver: "Cost saved: {amount}"
+                              const costSaved = fullPlan.metrics.monthlySaving || 0;
+                              return <>Cost saved: {currencySymbol}{Math.trunc(costSaved)}</>;
+                            } else if (activePlan.id === '2' && fullPlan?.type === 'eco') {
+                              // Eco Mode: "Eco gain: {percentage}%"
+                              const ecoGain = fullPlan.metrics.ecoImprovementPercentage || 0;
+                              return <>Eco gain: {ecoGain}%</>;
+                            } else if (activePlan.id === '3' && fullPlan?.type === 'balance') {
+                              // Comfort Balance: "Cost saved: {amount} • Eco gain: {percentage}%"
+                              const costSaved = fullPlan.metrics.monthlySaving || 0;
+                              const ecoGain = fullPlan.metrics.ecoFriendlyGainPercentage || 0;
+                              return <>Cost saved: {currencySymbol}{Math.trunc(costSaved)} • Eco gain: {ecoGain}%</>;
+                            }
+
+                            // Fallback
+                            return <>Savings: {activePlan.savings}</>;
+                          })()}
                         </div>
                       </div>
                     </div>

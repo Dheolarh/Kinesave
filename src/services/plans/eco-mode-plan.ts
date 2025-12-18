@@ -28,8 +28,33 @@ export class EcoModePlan {
         // Step 1: Get AI eco ratings + suggested hours
         const aiResponse = await this.getEcoOptimizedHours(data);
 
-        // Step 2: Trim each day to fit budget (with eco priority)
-        const dailySchedules = this.trimWithEcoPriority(aiResponse, data, targetBudget);
+        // Step 2: NEW - Enforce frequency rules (Eco Mode)
+        const { enforceFrequencyRules } = await import('../../utils/frequency-enforcer');
+
+        const frequencyRules = data.devices.map(d => ({
+            deviceId: d.id,
+            frequency: d.frequency as 'daily' | 'weekends' | 'rarely' | 'frequently',
+            priority: d.priority,
+            userSetHours: d.hoursPerDay,
+            wattage: d.wattage,
+            type: d.type
+        }));
+
+        console.log('Enforcing frequency rules (Eco Mode - emission priority)...');
+        const enforcedSchedule = enforceFrequencyRules(aiResponse.hours, frequencyRules, true);  // true = ECO mode
+
+        // Convert DaySchedule[] back to expected format
+        const enforcedHours: { [day: string]: { [deviceId: string]: number } } = {};
+        enforcedSchedule.forEach(daySchedule => {
+            enforcedHours[`day${daySchedule.dayNumber}`] = daySchedule.deviceHours;
+        });
+
+        // Step 3: Trim each day to fit budget (with eco priority)
+        const dailySchedules = this.trimWithEcoPriority(
+            { hours: enforcedHours, ratings: aiResponse.ratings },
+            data,
+            targetBudget
+        );
 
         // Step 3: Generate eco tips
         const smartAlerts = this.generateEcoTips(data.devices, aiResponse.ratings);
@@ -182,12 +207,54 @@ Rate AND suggest hours for ALL ${data.devices.length} devices across all 30 days
                     hours: dayHours[d.id] || 0,
                     wattage: d.wattage,
                     priority: ecoPriority, // Eco-adjusted priority
-                    type: d.type
+                    type: d.type,
+                    frequency: d.frequency as 'daily' | 'weekends' | 'rarely' | 'frequently'
                 };
             });
 
-            // Trim to fit budget
-            const trimmed = trimToFitBudget(deviceHours, dailyBudget, data.budget.pricePerKwh);
+            // Calculate frequency constraints (minimum hours per device)
+            const frequencyConstraints: { [deviceId: string]: number } = {};
+
+            // Helper: Check if day is weekend
+            const isWeekendDay = (dayNum: number): boolean => {
+                const dayOfWeek = ((dayNum - 1) % 7) + 1;
+                return dayOfWeek === 6 || dayOfWeek === 7;
+            };
+            const isWeekend = isWeekendDay(dayNum);
+
+            // Eco mode: frequency + emission constraints
+            data.devices.forEach(d => {
+                const ecoRating = aiResponse.ratings[d.id] || 50;
+                const isHighEmission = ecoRating < 60;  // Low eco rating = high emission
+
+                if (d.frequency === 'daily') {
+                    if (isHighEmission) {
+                        // High emission daily device: LOW hours regardless
+                        frequencyConstraints[d.id] = d.hoursPerDay * 0.3;  // Max 30%
+                    } else {
+                        // Low emission daily device: normal minimum
+                        frequencyConstraints[d.id] = d.hoursPerDay * (d.priority / 5) * 0.6;
+                    }
+                } else if (d.frequency === 'weekends') {
+                    if (isWeekend) {
+                        if (isHighEmission) {
+                            // High emission weekend device: LOW hours
+                            frequencyConstraints[d.id] = d.hoursPerDay * 0.3;
+                        } else {
+                            // Low emission weekend device: higher hours
+                            frequencyConstraints[d.id] = d.hoursPerDay * 0.8;
+                        }
+                    } else {
+                        frequencyConstraints[d.id] = 0;  // Off on weekdays
+                    }
+                } else {
+                    // Rarely/frequently: no hard minimum
+                    frequencyConstraints[d.id] = 0;
+                }
+            });
+
+            // Trim to fit budget with frequency constraints
+            const trimmed = trimToFitBudget(deviceHours, dailyBudget, data.budget.pricePerKwh, frequencyConstraints);
 
             // Calculate eco score for active devices
             let totalEcoScore = 0;
