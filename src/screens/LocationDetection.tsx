@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router";
 import { motion, AnimatePresence } from "motion/react";
 import { MapPin, Search } from "lucide-react";
-import { searchLocation, getWeatherData, getLocationFromStorage, type LocationData, type LocationSearchResult } from "../utils/location";
+import { searchLocation, getWeatherData, getLocationFromStorage, saveLocationToStorage, type LocationData, type LocationSearchResult } from "../utils/location";
 import { updateUserLocation } from "../utils/user-storage";
 
 export default function LocationDetection() {
@@ -63,6 +63,8 @@ export default function LocationDetection() {
         ...weatherData,
       };
 
+      // Save to localStorage so EnergyCostSetup can read it
+      saveLocationToStorage(fullLocationData);
       setLocationData(fullLocationData);
     } catch (err) {
       console.error("Weather fetch error:", err);
