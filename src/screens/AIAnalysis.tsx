@@ -46,13 +46,15 @@ export default function AIAnalysis() {
   };
 
   const startAnalysis = async () => {
-    if (selectedDevices.length > 0) {      
-      // Check if analysis has already been done (limit to 1 for testing)
+    if (selectedDevices.length > 0) {
+      // Check if analysis has already been done (limit to 1 for testing, unless in test mode)
+      const isTestMode = localStorage.getItem('testModeActive') === 'true';
       const existingPlans = getUserPlans();
-      if (existingPlans && (existingPlans.costSaver || existingPlans.ecoMode || existingPlans.comfortBalance)) {
+
+      if (!isTestMode && existingPlans && (existingPlans.costSaver || existingPlans.ecoMode || existingPlans.comfortBalance)) {
         // Import notification service
         const { default: notificationService } = await import('../services/notification.service');
-        
+
         // Send notification about analysis limit
         await notificationService.send({
           id: `analysis_limit_${Date.now()}`,
@@ -65,20 +67,129 @@ export default function AIAnalysis() {
         });
         return;
       }
-      
+
 
       setStage("analyzing");
       setCurrentStep(0);
 
       try {
-        // Import AI service dynamically
-        const { default: aiPlanService } = await import('../services/ai-plan.service');
+        const userData = getUserData();
+        if (!userData) throw new Error('User data not found');
 
-        // Call AI service to generate plans
-        const plans = await aiPlanService.generatePlans(selectedDevices);
+        // Get required data
+        const devices = availableDevices.filter(d => selectedDevices.includes(d.id));
+        let weatherForecast = userData.weather?.forecast || [];
 
-        // Save to centralized storage
-        updateUserPlans(plans);
+        // Fetch 30-day weather forecast if not available or insufficient
+        if (weatherForecast.length < 30 && userData.location) {
+          const { default: weatherService } = await import('../services/weather.service');
+          const { updateUserWeather } = await import('../utils/user-storage');
+
+          weatherForecast = await weatherService.getMonthlyForecast(
+            userData.location.latitude,
+            userData.location.longitude,
+            30,  // Get 30 days
+            false // Use hybrid (free) mode
+          );
+
+          // Save to storage for future use
+          updateUserWeather(weatherForecast);
+        }
+
+        const preferredBudget = userData.energyCosts?.preferredBudget || 4000;
+        const avgMonthlyCost = userData.energyCosts?.monthlyCost || 6000;
+        const pricePerKwh = userData.energyCosts?.pricePerKwh || 36;
+
+        // Step 1: AI Weather Analysis
+        const { analyzeWeatherExclusions } = await import('../services/AI-weather-analysis');
+        const weatherDevices = devices.map(d => ({
+          id: d.id,
+          name: d.customName || d.name,
+          type: d.deviceType || d.type
+        }));
+        const weatherData = weatherForecast.slice(0, 30).map((w: any, i: number) => ({
+          dayNumber: i + 1,
+          temp: w.avgTemp,
+          condition: w.condition
+        }));
+        const weatherExclusions = await analyzeWeatherExclusions(weatherDevices, weatherData);
+
+        // Step 2: AI Emission Analysis
+        const { analyzeEmissions } = await import('../services/AI-emission-analysis');
+        const emissionDevices = devices.map(d => ({
+          id: d.id,
+          name: d.customName || d.name,
+          type: d.deviceType || d.type,
+          watts: d.wattage || 0
+        }));
+        const emissionLevels = await analyzeEmissions(emissionDevices);
+
+        // Prepare device inputs
+        const deviceInputs = devices.map(d => ({
+          id: d.id,
+          name: d.customName || d.name,
+          watts: d.wattage || 0,
+          hoursPerDay: d.survey?.hoursPerDay || 0,
+          priority: d.survey?.priority || 3,
+          frequency: (d.survey?.frequency || 'daily') as 'daily' | 'weekends' | 'frequently' | 'rarely'
+        }));
+
+        // Calculate initial total hours for eco gain
+        const initialTotalHours = deviceInputs.reduce((sum, d) => sum + (d.hoursPerDay * 30), 0);
+
+        // Step 3: Generate Cost Plan
+        const { generateCostPlan } = await import('../services/cost-plan-logic');
+        const costPlan = generateCostPlan(deviceInputs, preferredBudget, pricePerKwh, weatherExclusions);
+
+        // Step 4: Generate Eco Plan
+        const { generateEcoPlan } = await import('../services/eco-plan-logic');
+        const ecoPlan = generateEcoPlan(deviceInputs, avgMonthlyCost, pricePerKwh, weatherExclusions, emissionLevels);
+        const ecoPlanTotalHours = ecoPlan.schedule.reduce((sum, day) =>
+          sum + day.devices.reduce((daySum, d) => daySum + d.hours, 0), 0
+        );
+
+        // Step 5: Generate Comfort Plan
+        const { generateComfortPlan } = await import('../services/comfort-plan-logic');
+        const comfortPlan = generateComfortPlan(costPlan, ecoPlan, avgMonthlyCost, preferredBudget, pricePerKwh);
+
+        // Step 6: Transform to AIPlan format
+        const { transformCostPlanToAIPlan, transformEcoPlanToAIPlan, transformComfortPlanToAIPlan } =
+          await import('../services/plan-transformer');
+
+        const deviceNames = devices.reduce((acc, d) => {
+          acc[d.id] = d.customName || d.name;
+          return acc;
+        }, {} as Record<string, string>);
+
+        const costAIPlan = transformCostPlanToAIPlan({
+          costPlan,
+          weatherData: weatherForecast.slice(0, 30),
+          preferredBudget,
+          deviceNames
+        });
+
+        const ecoAIPlan = transformEcoPlanToAIPlan({
+          ecoPlan,
+          weatherData: weatherForecast.slice(0, 30),
+          avgMonthlyCost,
+          initialTotalHours,
+          deviceNames
+        });
+
+        const comfortAIPlan = transformComfortPlanToAIPlan({
+          comfortPlan,
+          weatherData: weatherForecast.slice(0, 30),
+          avgMonthlyCost,
+          ecoPlanTotalHours,
+          deviceNames
+        });
+
+        // Step 7: Save plans (no plan activated by default)
+        updateUserPlans({
+          costSaver: costAIPlan,
+          ecoMode: ecoAIPlan,
+          comfortBalance: comfortAIPlan
+        });
 
         setStage("complete");
       } catch (err: any) {
@@ -120,6 +231,17 @@ export default function AIAnalysis() {
       return () => clearTimeout(navTimer);
     }
   }, [stage, navigate]);
+
+  useEffect(() => {
+    // Check if user already has plans (prevent re-analysis unless in test mode)
+    const isTestMode = localStorage.getItem('testModeActive') === 'true';
+    const plansData = getUserPlans();
+
+    if (plansData && plansData.activePlan && !isTestMode) {
+      // User already has plans and not in test mode - redirect to dashboard
+      navigate('/dashboard');
+    }
+  }, [navigate]);
 
   if (stage === "selection") {
     return (

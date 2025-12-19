@@ -464,40 +464,13 @@ export default function PlanDetails() {
                                 <div className="grid grid-cols-2 gap-3">
                                     <div className="bg-white/60 backdrop-blur-xl border border-white/60 rounded-2xl p-4 shadow-lg">
                                         <div className="text-xl mb-1">
-                                            {(() => {
-                                                const deviceKeys = Object.keys(dailySchedule || {}).filter(k => !['dayNumber', 'date', 'day', 'weather'].includes(k));
-                                                let totalHours = 0;
-                                                deviceKeys.forEach(deviceId => {
-                                                    const usage = (dailySchedule as any)[deviceId];
-                                                    if (usage && typeof usage === 'object' && usage.usage) {
-                                                        totalHours += usage.usage;
-                                                    }
-                                                });
-                                                return `${totalHours.toFixed(1)} hrs`;
-                                            })()}
+                                            {dailySchedule?.totalUsageHours?.toFixed(1) || '0.0'} hrs
                                         </div>
                                         <div className="text-xs text-black/50">Total Usage</div>
                                     </div>
                                     <div className="bg-white/60 backdrop-blur-xl border border-white/60 rounded-2xl p-4 shadow-lg">
                                         <div className="text-xl mb-1">
-                                            {(() => {
-                                                const userData = getUserData();
-                                                const pricePerKwh = userData?.energyCosts?.pricePerKwh || 36;
-                                                const currSym = currencySymbol;
-
-                                                const deviceKeys = Object.keys(dailySchedule || {}).filter(k => !['dayNumber', 'date', 'day', 'weather'].includes(k));
-                                                let totalCost = 0;
-                                                deviceKeys.forEach(deviceId => {
-                                                    const usage = (dailySchedule as any)[deviceId];
-                                                    if (usage && usage.usage && deviceNames[deviceId]) {
-                                                        const deviceWattage = deviceNames[deviceId].wattage || 150;
-                                                        const kwhUsed = (deviceWattage * usage.usage) / 1000;
-                                                        totalCost += kwhUsed * pricePerKwh;
-                                                    }
-                                                });
-
-                                                return `${currSym}${totalCost.toFixed(2)}`;
-                                            })()}
+                                            {currencySymbol}{dailySchedule?.estimatedCost?.toFixed(2) || '0.00'}
                                         </div>
                                         <div className="text-xs text-black/50">Estimated Daily Cost</div>
                                     </div>
@@ -509,27 +482,17 @@ export default function PlanDetails() {
 
                             {/* Scrollable Devices List */}
                             <div className="px-6 pb-6 overflow-y-auto scrollbar-hide" style={{ flex: 1, minHeight: 0 }}>
-                                {dailySchedule ? (
+                                {dailySchedule?.deviceSchedules && dailySchedule.deviceSchedules.length > 0 ? (
                                     <div className="space-y-2">
-                                        {Object.keys(dailySchedule || {}).filter(key => !['dayNumber', 'date', 'day', 'weather'].includes(key)).map((deviceId) => {
-                                            const usage = (dailySchedule as any)[deviceId];
-                                            if (!usage || typeof usage !== 'object') return null;
-
-
+                                        {dailySchedule.deviceSchedules.map((deviceSchedule: any) => {
+                                            const deviceId = deviceSchedule.deviceId;
                                             const device = deviceNames[deviceId];
                                             const deviceType = device?.type || '';
 
                                             // Get device name
-                                            let deviceName = deviceId;
+                                            let deviceName = deviceSchedule.deviceName || deviceId;
                                             if (device?.name) {
                                                 deviceName = device.name;
-                                            } else {
-                                                const fuzzyMatch = Object.keys(deviceNames).find(key =>
-                                                    deviceId.includes(key) || key.includes(deviceId.split('_')[0])
-                                                );
-                                                if (fuzzyMatch && deviceNames[fuzzyMatch]?.name) {
-                                                    deviceName = deviceNames[fuzzyMatch].name;
-                                                }
                                             }
 
                                             // Get priority from actual user device data
@@ -557,7 +520,7 @@ export default function PlanDetails() {
                                                     </div>
                                                     <div className="flex justify-between items-center pt-2">
                                                         <span className="text-xs text-black/50">Use Time</span>
-                                                        <span className="text-sm">{usage.usage ? `${usage.usage} hrs` : 'Off'}</span>
+                                                        <span className="text-sm">{deviceSchedule.hoursOfUse ? `${deviceSchedule.hoursOfUse} hrs` : 'Off'}</span>
                                                     </div>
                                                 </div>
                                             );

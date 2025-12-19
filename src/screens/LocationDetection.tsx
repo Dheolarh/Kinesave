@@ -3,7 +3,11 @@ import { useNavigate } from "react-router";
 import { motion, AnimatePresence } from "motion/react";
 import { MapPin, Search } from "lucide-react";
 import { searchLocation, getWeatherData, getLocationFromStorage, saveLocationToStorage, type LocationData, type LocationSearchResult } from "../utils/location";
-import { updateUserLocation } from "../utils/user-storage";
+import { updateUserLocation, updateUserEnergyCosts, updateUserDevices, getUserData } from "../utils/user-storage";
+import { testEnergyCosts, testDevices } from "../utils/test-data";
+import getSymbolFromCurrency from "currency-symbol-map";
+// @ts-ignore - Library doesn't have TypeScript types
+import { getCountry } from "country-currency-map";
 
 export default function LocationDetection() {
   const navigate = useNavigate();
@@ -12,6 +16,24 @@ export default function LocationDetection() {
   const [searchResults, setSearchResults] = useState<LocationSearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [mapPinTapCount, setMapPinTapCount] = useState(0);
+  const tapTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Get currency info for any country (automatic mapping!)
+  const getCurrencyForCountry = (countryName: string): { symbol: string; code: string } => {
+    try {
+      const countryData = getCountry(countryName);
+      if (countryData && countryData.currency) {
+        const code = countryData.currency;
+        const symbol = getSymbolFromCurrency(code) || "$";
+        return { symbol, code };
+      }
+    } catch (error) {
+      console.log(`Currency mapping not found for ${countryName}, using USD`);
+    }
+    // Default to USD if not found
+    return { symbol: "$", code: "USD" };
+  };
 
   useEffect(() => {
     // Check if location is already stored
@@ -66,6 +88,28 @@ export default function LocationDetection() {
       // Save to localStorage so EnergyCostSetup can read it
       saveLocationToStorage(fullLocationData);
       setLocationData(fullLocationData);
+
+      // Auto-save to user storage immediately
+      updateUserLocation({
+        city: fullLocationData.city,
+        region: fullLocationData.region,
+        country: fullLocationData.country,
+        latitude: fullLocationData.lat || 0,
+        longitude: fullLocationData.lon || 0,
+        temperature: fullLocationData.temperature,
+        weatherDescription: fullLocationData.weatherDescription || "",
+      });
+
+      // Auto-save energy costs with currency from location
+      const currencyData = getCurrencyForCountry(fullLocationData.country);
+
+      updateUserEnergyCosts({
+        monthlyCost: 0,
+        pricePerKwh: 0,
+        preferredBudget: null,
+        currency: currencyData.code,
+        currencySymbol: currencyData.symbol,
+      });
     } catch (err) {
       console.error("Weather fetch error:", err);
       alert("Failed to fetch weather data. Please try another location.");
@@ -95,6 +139,96 @@ export default function LocationDetection() {
     }
   };
 
+  // Handle MapPin tap for test mode activation (4 taps)
+  const handleMapPinTap = () => {
+    if (!locationData) return;
+
+    const newCount = mapPinTapCount + 1;
+    setMapPinTapCount(newCount);
+
+    // Reset counter after 2 seconds
+    if (tapTimeoutRef.current) {
+      clearTimeout(tapTimeoutRef.current);
+    }
+    tapTimeoutRef.current = setTimeout(() => {
+      setMapPinTapCount(0);
+    }, 2000);
+
+    // Activate test mode on 4th tap
+    if (newCount === 4) {
+      setMapPinTapCount(0);
+
+      // Check if user has saved location first
+      const userData = getUserData();
+      if (!userData?.location) {
+        alert('Please save your location first before activating test mode!');
+        return;
+      }
+
+      // Save test mode to localStorage
+      localStorage.setItem('testModeActive', 'true');
+
+      // Load test data (devices and energy costs only, NOT location)
+      import('../utils/test-data').then(({ testEnergyCosts, testDevices }) => {
+        // Get currency from current location
+        const currency = userData?.energyCosts?.currency || 'USD';
+        const currencySymbol = userData?.energyCosts?.currencySymbol || '$';
+
+        // Merge test costs with location-based currency
+        updateUserEnergyCosts({
+          ...testEnergyCosts,
+          currency,
+          currencySymbol
+        });
+        updateUserDevices(testDevices);
+        console.log('Test mode activated: loaded test devices and energy costs');
+
+        // Navigate to dashboard after data is loaded
+        setTimeout(() => navigate('/dashboard'), 500);
+      });
+    }
+  };
+
+  // TEST SETUP - Pre-configure 7 devices and go to dashboard
+  const handleTestSetup = () => {
+    try {
+      if (!locationData) {
+        alert('Please set a location first!');
+        return;
+      }
+
+      // Save location
+      updateUserLocation({
+        city: locationData.city,
+        region: locationData.region,
+        country: locationData.country,
+        latitude: locationData.lat || 0,
+        longitude: locationData.lon || 0,
+        temperature: locationData.temperature,
+        weatherDescription: locationData.weatherDescription || "",
+      });
+
+      // Set up test energy costs (imported from test-data.ts)
+      // Get currency from detected location
+      const currency = getCurrencyForCountry(locationData.country);
+      updateUserEnergyCosts({
+        ...testEnergyCosts,
+        currency: currency.code,
+        currencySymbol: currency.symbol,
+      });
+
+      // Pre-configure 7 test devices (imported from test-data.ts)
+      updateUserDevices(testDevices);
+
+      // Navigate to dashboard
+      console.log('Test setup complete! 7 devices configured.');
+      navigate('/dashboard');
+    } catch (error) {
+      console.error('Test setup failed:', error);
+      alert('Test setup failed. Please try again.');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex flex-col items-center justify-center px-6">
       <motion.div
@@ -107,11 +241,12 @@ export default function LocationDetection() {
           // Show detected location with Continue button
           <>
             <div className="mb-8">
-              <motion.div
-                className="w-16 h-16 mx-auto mb-6 bg-white/40 backdrop-blur-xl border border-white/60 rounded-full flex items-center justify-center shadow-lg"
+              <button
+                onClick={handleMapPinTap}
+                className="w-16 h-16 mx-auto mb-6 bg-white/40 backdrop-blur-xl border border-white/60 rounded-full flex items-center justify-center shadow-lg hover:bg-white/50 transition-colors"
               >
                 <MapPin className="w-7 h-7" strokeWidth={1.5} />
-              </motion.div>
+              </button>
             </div>
 
             <h2 className="text-2xl mb-3 tracking-tight">Location Set</h2>
@@ -131,10 +266,12 @@ export default function LocationDetection() {
                 {locationData.region && `, ${locationData.region} `}
                 {locationData.country && `, ${locationData.country} `}
               </p>
+
               <p className="text-xs mb-6 text-black/50">
                 {locationData.temperature}°C • {locationData.humidity}% humidity
                 {locationData.weatherDescription && ` • ${locationData.weatherDescription} `}
               </p>
+
               <button
                 onClick={handleContinue}
                 className="px-8 py-3 bg-black text-white rounded-full text-sm tracking-wide hover:bg-black/90 transition-colors"
@@ -148,7 +285,6 @@ export default function LocationDetection() {
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.3 }}
           >
             <h2 className="text-2xl mb-3 tracking-tight">Enter Your Location</h2>
             <p className="text-sm text-black/60 mb-6">

@@ -32,6 +32,8 @@ export default function Dashboard() {
   const [locationSearchQuery, setLocationSearchQuery] = useState("");
   const [locationSearchResults, setLocationSearchResults] = useState<LocationSearchResult[]>([]);
   const [isUpdatingLocation, setIsUpdatingLocation] = useState(false);
+  const [isTestMode, setIsTestMode] = useState(false);
+  const [showExitTestModeModal, setShowExitTestModeModal] = useState(false);
   const longPressTimer = useRef<NodeJS.Timeout | null>(null);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const planLongPressTimer = useRef<NodeJS.Timeout | null>(null);
@@ -48,6 +50,9 @@ export default function Dashboard() {
     setUserId(storedUserId);
     // Load notification count
     loadUnreadCount();
+    // Check if test mode is active
+    const testMode = localStorage.getItem('testModeActive') === 'true';
+    setIsTestMode(testMode);
   }, []);
 
   const loadUnreadCount = () => {
@@ -314,6 +319,16 @@ export default function Dashboard() {
     }
   };
 
+  const handleExitTestMode = () => {
+    const currentUserId = getCurrentUserId();
+    localStorage.clear();
+    if (currentUserId) {
+      localStorage.setItem('userId', currentUserId);
+    }
+    localStorage.setItem('testModeActive', 'false');
+    navigate('/location');
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 pb-20 overflow-y-auto scrollbar-hide">
       <div className="px-5 pt-4 pb-6">
@@ -323,7 +338,7 @@ export default function Dashboard() {
           transition={{ duration: 0.5 }}
         >
           {/* Header */}
-          <div className="px-3 pt-2 pb-4">
+          < div className="px-3 pt-2 pb-4" >
             <div className="flex items-center justify-between mb-2">
               <h1
                 className="text-2xl tracking-tight"
@@ -342,25 +357,35 @@ export default function Dashboard() {
                   "My Devices"
                 )}
               </h1>
-              {/* Notification Bell */}
-              <button
-                onClick={() => setShowNotificationCenter(true)}
-                className="relative w-10 h-10 flex items-center justify-center"
-              >
-                <Bell className="w-5 h-5" strokeWidth={1.5} />
-                {/* Unread indicator dot */}
-                {unreadCount > 0 && (
-                  <div
-                    className="absolute bg-black rounded-full"
-                    style={{
-                      top: '6px',
-                      right: '6px',
-                      width: '6px',
-                      height: '6px'
-                    }}
-                  />
+              {/* Test Mode Text and Notification Bell */}
+              <div className="flex items-center gap-3">
+                {isTestMode && (
+                  <button
+                    onClick={() => setShowExitTestModeModal(true)}
+                    className="text-xs text-black/50 hover:text-black/80 transition-colors"
+                  >
+                    Test Mode
+                  </button>
                 )}
-              </button>
+                <button
+                  onClick={() => setShowNotificationCenter(true)}
+                  className="relative w-10 h-10 flex items-center justify-center"
+                >
+                  <Bell className="w-5 h-5" strokeWidth={1.5} />
+                  {/* Unread indicator dot */}
+                  {unreadCount > 0 && (
+                    <div
+                      className="absolute bg-black rounded-full"
+                      style={{
+                        top: '6px',
+                        right: '6px',
+                        width: '6px',
+                        height: '6px'
+                      }}
+                    />
+                  )}
+                </button>
+              </div>
             </div>
             <div className="flex items-center justify-between text-sm text-black/60">
               {/* Clickable location */}
@@ -376,9 +401,9 @@ export default function Dashboard() {
                 <CloudSun className="w-4 h-4" strokeWidth={1.5} />
               </div>
             </div>
-          </div>
-        </motion.div>
-      </div>
+          </div >
+        </motion.div >
+      </div >
 
       <div className="px-5 space-y-4">
         {/* Active Plan Card - Only show if user has an active plan */}
@@ -888,7 +913,46 @@ export default function Dashboard() {
             </motion.div>
           </>
         )}
+
+        {/* Exit Test Mode Modal */}
+        {showExitTestModeModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-5"
+            style={{ zIndex: 9999 }}
+            onClick={() => setShowExitTestModeModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="text-lg font-semibold mb-2">Exit Test Mode?</h3>
+              <p className="text-sm text-black/60 mb-6">
+                This will clear all your data (devices, plans, location, etc.) and take you back to the location setup. Your user ID will be preserved.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowExitTestModeModal(false)}
+                  className="flex-1 py-3 px-4 rounded-xl border border-black/10 hover:bg-black/5 transition-colors text-sm"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleExitTestMode}
+                  className="flex-1 py-3 px-4 rounded-xl bg-black text-white hover:bg-black/90 transition-colors text-sm"
+                >
+                  Exit
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
       </AnimatePresence>
-    </div>
+    </div >
   );
 }

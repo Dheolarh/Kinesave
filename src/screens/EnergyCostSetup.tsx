@@ -154,8 +154,8 @@ export default function EnergyCostSetup() {
       updateUserEnergyCosts(energyData);
       updateUserDevices(devicesData);
 
-      // Navigate to about user page
-      navigate("/about-user");
+      // Navigate to dashboard
+      navigate("/dashboard");
     } catch (error) {
       console.error("Failed to save energy data:", error);
       alert("Failed to save data. Please try again.");

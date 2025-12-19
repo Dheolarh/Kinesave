@@ -51,13 +51,13 @@ export default function SplashScreen() {
     const status = getProfileCompletionStatus(profile);
 
     // All empty - normal flow
-    if (!status.hasLocation && !status.hasEnergyCosts && !status.hasAboutUser) {
+    if (!status.hasLocation && !status.hasEnergyCosts) {
       navigate("/location");
       return;
     }
 
     // Has data but missing location
-    if (!status.hasLocation && status.hasEnergyCosts && status.hasAboutUser) {
+    if (!status.hasLocation && status.hasEnergyCosts) {
       navigate("/dashboard", { state: { showLocationSetup: true } });
       return;
     }
@@ -68,11 +68,6 @@ export default function SplashScreen() {
       return;
     }
 
-    // Missing about user
-    if (!status.hasAboutUser) {
-      navigate("/about-user");
-      return;
-    }
 
     // Everything complete
     navigate("/dashboard");
