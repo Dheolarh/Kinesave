@@ -125,7 +125,7 @@ export function transformEcoPlanToAIPlan(input: TransformInput): AIPlan {
         id: `eco-plan-${Date.now()}`,
         type: 'eco',
         name: 'Eco Mode Plan',
-        description: 'Reduces emission by reducing use time of devices while staying in budget',
+        description: 'Reduces emission by reducing use time of highly emissive devices while staying in budget',
         metrics,
         dailySchedules,
         dailyTips: [],

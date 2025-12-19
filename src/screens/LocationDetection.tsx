@@ -40,6 +40,32 @@ export default function LocationDetection() {
     const savedLocation = getLocationFromStorage();
     if (savedLocation) {
       setLocationData(savedLocation);
+
+      // Also save to user storage if not already there
+      const userData = getUserData();
+      if (!userData?.location) {
+        updateUserLocation({
+          city: savedLocation.city,
+          region: savedLocation.region,
+          country: savedLocation.country,
+          latitude: savedLocation.lat || 0,
+          longitude: savedLocation.lon || 0,
+          temperature: savedLocation.temperature,
+          weatherDescription: savedLocation.weatherDescription || "",
+        });
+
+        // Also save currency
+        const currencyData = getCurrencyForCountry(savedLocation.country);
+        updateUserEnergyCosts({
+          monthlyCost: 0,
+          pricePerKwh: 0,
+          preferredBudget: null,
+          currency: currencyData.code,
+          currencySymbol: currencyData.symbol,
+        });
+
+        console.log('Loaded location from localStorage and saved to user storage');
+      }
     }
   }, []);
 
@@ -110,6 +136,9 @@ export default function LocationDetection() {
         currency: currencyData.code,
         currencySymbol: currencyData.symbol,
       });
+
+      console.log('Location auto-saved:', fullLocationData.city, fullLocationData.country);
+      console.log('Currency auto-saved:', currencyData.code, currencyData.symbol);
     } catch (err) {
       console.error("Weather fetch error:", err);
       alert("Failed to fetch weather data. Please try another location.");
@@ -158,12 +187,8 @@ export default function LocationDetection() {
     if (newCount === 4) {
       setMapPinTapCount(0);
 
-      // Check if user has saved location first
+      // Get userData for currency
       const userData = getUserData();
-      if (!userData?.location) {
-        alert('Please save your location first before activating test mode!');
-        return;
-      }
 
       // Save test mode to localStorage
       localStorage.setItem('testModeActive', 'true');

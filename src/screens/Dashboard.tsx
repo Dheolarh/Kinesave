@@ -320,13 +320,10 @@ export default function Dashboard() {
   };
 
   const handleExitTestMode = () => {
-    const currentUserId = getCurrentUserId();
+    // Clear everything - complete reset
     localStorage.clear();
-    if (currentUserId) {
-      localStorage.setItem('userId', currentUserId);
-    }
-    localStorage.setItem('testModeActive', 'false');
-    navigate('/location');
+    // Navigate to splash screen
+    navigate('/');
   };
 
   return (
