@@ -3,7 +3,7 @@ import { useNavigate } from "react-router";
 import BottomNav from "../components/BottomNav";
 import FloatingAIRing from "../components/FloatingAIRing";
 import AddDeviceModal from "../components/AddDeviceModal";
-import { getCurrentUserId, getUserData, getUserPlans, updateUserDevices, updateUserLocation, updateUserPlans } from "../utils/user-storage";
+import { getCurrentUserId, getUserData, getUserPlans, updateUserDevices, updateUserLocation, updateUserEnergyCosts, updateUserPlans } from "../utils/user-storage";
 import { searchLocation, getWeatherData } from "../utils/location";
 import type { LocationSearchResult } from "../utils/location";
 import { Plus, CloudSun, X, MapPin, Bell, TrendingDown, Leaf, Gauge } from "lucide-react";
@@ -11,6 +11,9 @@ import { motion, AnimatePresence } from "motion/react";
 import NotificationCenter from "../components/NotificationCenter";
 import notificationService from "../services/notification.service";
 import { getDeviceIcon } from "../utils/device-types";
+// @ts-ignore
+import { getCountry } from "country-currency-map";
+import getSymbolFromCurrency from "currency-symbol-map";
 
 
 export default function Dashboard() {
@@ -304,6 +307,32 @@ export default function Dashboard() {
 
       // Update location in localStorage
       updateUserLocation(newLocationData);
+
+      // Update currency based on new country
+      const getCurrencyData = (countryName: string) => {
+        try {
+          const countryData = getCountry(countryName);
+          if (countryData && countryData.currency) {
+            const code = countryData.currency;
+            const symbol = getSymbolFromCurrency(code) || "$";
+            return { symbol, code };
+          }
+        } catch (error) {
+          console.log(`Currency mapping not found for ${countryName}, using USD`);
+        }
+        return { symbol: "$", code: "USD" };
+      };
+
+      const currencyData = getCurrencyData(result.country);
+
+      const userData = getUserData();
+      if (userData?.energyCosts) {
+        updateUserEnergyCosts({
+          ...userData.energyCosts,
+          currency: currencyData.code,
+          currencySymbol: currencyData.symbol,
+        });
+      }
 
       // Update local state
       setLocation(newLocationData);
