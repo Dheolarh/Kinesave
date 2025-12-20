@@ -58,6 +58,33 @@ export default function Dashboard() {
     setIsTestMode(testMode);
   }, []);
 
+  // Handle back button on mobile - exit app instead of navigating back
+  useEffect(() => {
+    const handleBackButton = (e: PopStateEvent) => {
+      e.preventDefault();
+      // For median.co mobile apps, we can use window.history manipulation
+      // Push a dummy state so there's nothing to go back to
+      window.history.pushState(null, '', window.location.href);
+
+      // If user tries to go back again, close the app (median.co specific)
+      // This relies on the median webview detecting that there's no history
+      if (window.history.state === null) {
+        // Try median.co exit method if available
+        if ((window as any).median?.exit) {
+          (window as any).median.exit();
+        }
+      }
+    };
+
+    // Push initial state to prevent back navigation
+    window.history.pushState(null, '', window.location.href);
+    window.addEventListener('popstate', handleBackButton);
+
+    return () => {
+      window.removeEventListener('popstate', handleBackButton);
+    };
+  }, []);
+
   const loadUnreadCount = () => {
     setUnreadCount(notificationService.getUnreadCount());
   };
