@@ -234,16 +234,7 @@ export default function AIAnalysis() {
     }
   }, [stage, navigate]);
 
-  useEffect(() => {
-    // Check if user already has plans (prevent re-analysis unless in test mode)
-    const isTestMode = localStorage.getItem('testModeActive') === 'true';
-    const plansData = getUserPlans();
 
-    if (plansData && plansData.activePlan && !isTestMode) {
-      // User already has plans and not in test mode - redirect to dashboard
-      navigate('/dashboard');
-    }
-  }, [navigate]);
 
   if (stage === "selection") {
     return (
