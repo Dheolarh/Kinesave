@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { motion } from "motion/react";
-import { Check, ArrowLeft } from "lucide-react";
+import { Check, ArrowLeft, Edit2 } from "lucide-react";
 import Orb from "../components/Orb";
 import { getUserData, getUserPlans, updateUserPlans } from "../utils/user-storage";
 import { getDeviceIcon } from "../utils/device-types";
+import EnergyCostEditModal from "../components/EnergyCostEditModal";
 
 const analysisSteps = [
   "Scanning device usage patterns",
@@ -19,6 +20,7 @@ export default function AIAnalysis() {
   const [availableDevices, setAvailableDevices] = useState<any[]>([]);
   const [selectedDevices, setSelectedDevices] = useState<string[]>([]);
   const [currentStep, setCurrentStep] = useState(0);
+  const [showEnergyCostModal, setShowEnergyCostModal] = useState(false);
 
   // Load user devices from localStorage
   useEffect(() => {
@@ -247,12 +249,21 @@ export default function AIAnalysis() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 pb-32 overflow-y-auto scrollbar-hide">
         <div className="px-5 pt-8 pb-6">
-          <button
-            onClick={() => navigate("/dashboard")}
-            className="w-10 h-10 rounded-full border border-black/10 flex items-center justify-center mb-6 hover:border-black/20 transition-colors"
-          >
-            <ArrowLeft className="w-5 h-5" strokeWidth={1.5} />
-          </button>
+          <div className="flex items-center justify-between mb-6">
+            <button
+              onClick={() => navigate("/dashboard")}
+              className="w-10 h-10 rounded-full border border-black/10 flex items-center justify-center hover:border-black/20 transition-colors"
+            >
+              <ArrowLeft className="w-5 h-5" strokeWidth={1.5} />
+            </button>
+
+            <button
+              onClick={() => setShowEnergyCostModal(true)}
+              className="w-10 h-10 flex items-center justify-center hover:border-black/20 transition-colors"
+            >
+              <Edit2 className="w-5 h-5" strokeWidth={1.5} />
+            </button>
+          </div>
 
           <motion.div
             initial={{ opacity: 0, y: -10 }}
@@ -319,6 +330,12 @@ export default function AIAnalysis() {
             Analyze {selectedDevices.length > 0 && `(${selectedDevices.length} devices)`}
           </motion.button>
         </div>
+
+        {/* Energy Cost Edit Modal */}
+        <EnergyCostEditModal
+          isOpen={showEnergyCostModal}
+          onClose={() => setShowEnergyCostModal(false)}
+        />
       </div>
     );
   }
